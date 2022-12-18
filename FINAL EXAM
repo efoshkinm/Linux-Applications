@@ -1,0 +1,1240 @@
+Условие задания:
+Для вас создано 4 виртуальных машины с дистрибутивом Ubuntu. Они имеют следующие IP-адреса:
+
+  "application" = "ip: 10.130.0.36, nat: 158.160.41.200"
+  "database" = "ip: 10.130.0.5, nat: "
+  "monitoring" = "ip: 10.130.0.18, nat: "
+  "storage" = "ip: 10.130.0.23, nat: "
+Кроме того, для вас добавлена wildcard DNS-запись *.crane.linux.srwx.net. A 158.160.41.200
+
+На машины вы можете подключаться от имени пользователя ubuntu при помощи SSH-ключа, публичную часть которого вы прислали ранее.
+
+На этих серверах вам требуется запустить приложение NextCloud, соблюдая правила и условия, указанные ниже в соответствующих разделах.
+
+Данные для переменных, указанных в теле задания:
+
+json
+Вариант X: {"storage": "nfs", "database": "mariadb", "logging": "graylog", "balancer": "nginx_phpfpm"}
+Требования к реализации:
+
+К запущенному приложению:
+
+Запускаться приложение должно через "balancer" (значение указано выше).
+Приложение должно быть запущено на сервере application и должно быть доступно извне.
+Приложение должно быть доступно по доменному имени nextcloud.crane.linux.srwx.net.
+Приложение должно поддерживать загрузку файлов до 1 GiB.
+Для домена должно быть настроено автоматическое получение сертификата через Let's Encrypt, который должен использовать балансировщик.
+В приложении должен быть создан пользователь rebrainme с паролем nextcloud, которому даны права Super Administrator.
+Код приложения должен храниться в директории /var/www/nextcloud.
+Хранение данных приложения должно производиться через хранилище, предоставленное системой хранения на сервере storage. Оно должно автоматически подключаться к хосту при перезапуске сервера.
+Приложение должно использовать базу, запущенную на сервере database.
+Периодические задачи приложения должны запускаться в cron, описанном в файле /etc/cron.d/nextcloud.
+К базе данных:
+
+Используемая СУБД определена в "database" (значение указано выше).
+Хранение данных СУБД должно производиться через хранилище, предоставленное системой хранения на сервере storage. Оно должно автоматически подключаться к хосту при перезапуске сервера.
+Для приложения в СУБД должен быть создан пользователь nextcloud с паролем nextclouddatabasepassword, а также база данных nextcloud.
+Для Grafana в СУБД должен быть создан пользователь grafana с паролем grafanadatabasepassword, а также база данных grafana.
+Для доступа к СУБД на сервере application должен быть установлен adminer.
+Adminer должен храниться на сервере application в директории /var/www/adminer.
+Приложение должно быть доступно по доменному имени adminer.crane.linux.srwx.net.
+Для домена должно быть настроено автоматическое получение сертификата через Let's Encrypt, который должен использовать балансировщик.
+Для доступа к adminer должна использоваться Basic Auth авторизация с логином rebrainme и паролем adminer.
+К системе мониторинга:
+
+В роли системы мониторинга должен использоваться Prometheus.
+Сервер должен быть запущен на сервере monitoring.
+Хранение данных Prometheus должно производиться через хранилище, предоставленное системой хранения на сервере storage. Оно должно автоматически подключаться к хосту при перезапуске сервера.
+На каждом сервере должен быть установлен node_exporter, который должен слушать только на приватном адресе и с которого должен собирать метрики Prometheus server.
+Prometheus server и node_exporter должны запускаться через Systemd Unit.
+Prometheus Web UI должен быть доступен по доменному имени prometheus.crane.linux.srwx.net.
+Для домена должно быть настроено автоматическое получение сертификата через Let's Encrypt, который должен использовать балансировщик.
+Для доступа к Prometheus Web UI должна использоваться Basic Auth авторизация с логином rebrainme и паролем prometheus.
+К системе сбора логов:
+
+В роли системы сбора логов должна использоваться система из "logging" (значение указано выше).
+Система должна быть запущена на сервере monitoring.
+Хранение данных ElasticSearch должно производиться через хранилище, предоставленное системой хранения на сервере storage. Оно должно автоматически подключаться к хосту при перезапуске сервера.
+На сервере должна быть настроена ротация логов в 7 дней.
+На сервер должны собираться логи работы NextCloud, СУБД, системы хранения данных, Prometheus Server, системы сбора логов, балансировщика и cron задач любым решением на ваш выбор.
+Web UI системы сбора логов должен быть доступен по доменному имени logz.crane.linux.srwx.net.
+Для домена должно быть настроено автоматическое получение сертификата через Let's Encrypt, который должен использовать балансировщик.
+Для доступа к Prometheus Web UI должна использоваться Basic Auth авторизация с логином rebrainme и паролем logz.
+К Grafana:
+
+На сервере monitoring должна быть установлена Grafana.
+Приложение должно быть доступно по доменному имени grafana.crane.linux.srwx.net.
+Для домена должно быть настроено автоматическое получение сертификата через Let's Encrypt, который должен использовать балансировщик.
+В Grafana должен быть создан пользователь rebrainme с паролем для входа grafana, которому даны права уровня Admin.
+Grafana для хранения пользователей и дашбордов должна использовать базу данных grafana и пользователя grafana, как описано в требованиях к базе данных.
+Grafana должна подключаться к Prometheus и системе сбора логов в роли Datasource.
+В Grafana должны быть созданы 2 дашборда:
+метрики с node_exporter;
+с количеством логов с каждого сервера из Cron и количеством запросов на каждый домен балансировщика.
+К системе хранения данных:
+
+В роли системы хранения данных должно использоваться приложение "storage" (значение указано выше).
+Система хранения данных должна запускаться на сервере storage.
+На сервере подключено 3 дополнительных диска. Они должны использоваться следующим образом:
+диск объемом 10 GiB — для хранения данных NextCloud;
+диск объемом 10 GiB — для хранения данных системы сбора логов;
+диск объемом 5 GiB — для хранения данных Prometheus.
+Порядок действий во время презентации проекта:
+
+Продемонстрировать через браузер:
+Зайти в NextCloud от имени пользователя rebrainme.
+Зайти в Adminer от имени пользователя rebrainme, зайти в базу данных nextcloud с данными для доступа пользователя nextcloud.
+Зайти в Prometheus Web UI, продемонстрировать targets сервера.
+Зайти в систему сбора логов, продемонстрировать наличие логов.
+Зайти в Grafana от имени пользователя rebrainme и продемонстрировать работу дашбордов.
+Продемонстрировать на сервере application:
+конфигурационные файлы системы сбора логов;
+конфигурационные файлы балансировщика;
+конфигурацию Let's Encrypt и актуальные сертификаты;
+список примонтированных файловых систем;
+файл конфигурации автоматического монтирования файловых систем;
+crontabs Let's encrypt и приложения;
+содержимое директории /var/www;
+конфигурационный файл NextCloud.
+Продемонстрировать на сервере database:
+конфигурационные файлы системы сбора логов;
+список созданных пользователей в СУБД.
+Продемонстрировать на сервере monitoring:
+конфигурационные файлы системы сбора логов;
+список примонтированных файловых систем;
+файл конфигурации автоматического монтирования файловых систем;
+конфигурационный файл Prometheus;
+конфигурационный файл Grafana;
+Systemd unit для Prometheus и node_exporter;
+конфигурацию ротации логов на 7 дней для вашей системы сбора логов.
+Продемонстрировать на сервере storage:
+конфигурационные файлы системы сбора логов;
+конфигурационные файлы системы хранения данных.
+Продемонстрировать работу NextCloud, выгрузив на него файл объемом в 150 мегабайт и скачав его после отгрузки.
+
+
+
+*********************************************************************************************************************
+Решение
+*********************************************************************************************************************
+
+### Установка the application server
+```
+  "application" = "ip: 10.130.0.36, nat: 158.160.41.200"
+  "database" = "ip: 10.130.0.5, nat: "
+  "monitoring" = "ip: 10.130.0.18, nat: "
+  "storage" = "ip: 10.130.0.23, nat: "
+  
+  
+***************************************************************
+APPLICATION
+***************************************************************
+apt update
+apt install nginx-full
+apt install php-fpm
+apt-get install certbot
+
+mkdir /var/www/nextcloud
+sudo chown -R www-data:www-data /var/www/nextcloud/
+certbot certonly  --webroot -w /var/www/nextcloud -d nextcloud.crane.linux.srwx.net -m m.efoshkin@yandex.ru
+
+Скачиваем nexcloud
+mkdir -p /opt/nextcloud
+wget https://download.nextcloud.com/server/releases/latest.zip
+mv nextcloud/ /var/www
+chown -R www-data:www-data /var/www/nextcloud
+
+apt install unzip
+unzip latest.zip
+nextcloud.crane.linux.srwx.net
+
+
+apt install chrony
+timedatectl set-timezone Europe/Moscow
+systemctl enable chrony
+
+iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+apt install iptables-persistent
+netfilter-persistent save
+
+
+Установка PHP
+Рекомендуемая версия php для nextcloud это 8.1
+
+Посмотреть, какая версия будет установлена из репозитория системы можно командой:
+apt search --names-only '^php[.0-9]{3}$'
+
+export PHP_VER=8.1
+
+Если она соответствует рекомендации Nextcloud, вводим команду для установки PHP, PHP-FPM и необходимых расширений:
+apt install php php-fpm php-common php-zip php-xml php-intl php-gd php-mysql php-mbstring php-curl php-imagick
+
+
+Если нам необходима версия PHP, которой нет в репозитории, выполняем установку дополнительного — для этого вводим две команды:
+apt install software-properties-common
+add-apt-repository ppa:ondrej/php
+
+Если рекомендованной PHP версии в репозитории нет, переходим к инструкции Установка разных версий PHP на Linux Ubuntu. А для установки расширений используем команду:
+apt install php${PHP_VER}-fpm php${PHP_VER}-common php${PHP_VER}-zip php${PHP_VER}-xml php${PHP_VER}-intl php${PHP_VER}-gd php${PHP_VER}-mysql php${PHP_VER}-mbstring php${PHP_VER}-curl php${PHP_VER}-imagick php${PHP_VER}-gmp php${PHP_VER}-bcmath libmagickcore-6.q16-6-extra
+
+Настраиваем PHP
+vi /etc/php/${PHP_VER}/fpm/pool.d/www.conf
+Снимаем комментарии со следующей строки:cd ..
+env[PATH] = /usr/local/bin:/usr/bin:/bin
+
+vi /etc/php/${PHP_VER}/fpm/php.ini
+opcache.enable_cli=1
+opcache.interned_strings_buffer=32
+opcache.revalidate_freq=1
+
+Разрешаем автозапуск php-fpm и перезапускаем его:
+systemctl enable php${PHP_VER}-fpm
+systemctl restart php${PHP_VER}-fpm
+
+Настраиваем хранение для nextcloud
+mkdir /var/www/nextcloud/data
+
+root@crane-application:/etc/systemd/system# cat mnt-nextcloud_data.mount 
+[Unit]
+Description=Database storage mount
+After=network.target
+[Mount]
+What=10.130.0.23:/mnt/nextcloud_data
+Where=/mnt/nextcloud_data
+Type=nfs4
+Options=rw,defaults
+DirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
+
+
+apt install nfs-common
+systemctl enable --now mnt-nextcloud_data.mount
+
+
+После установки Базы данных запускаем установщик nextcloud
+root@crane-application:/var/www/nextcloud# sudo -u www-data php occ  maintenance:install --database "mysql" --database-host "10.130.0.5" --database-port "3306" --database-name "nextcloud"  --database-user "nextcloud" --database-pass "nextclouddatabasepassword" --data-dir "/mnt/nextcloud_data" --admin-user "rebrainme" --admin-pass "nextcloud"
+
+Nextcloud was successfully installed
+
+Генерация Let's encrypt
+root@crane-application:/etc/nginx/sites-enabled# certbot certonly  --webroot -w /var/www/nextcloud -d nextcloud.crane.linux.srwx.net  -m m.efoshkin@rebrainme.ru
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Plugins selected: Authenticator webroot, Installer None
+Obtaining a new certificate
+Performing the following challenges:
+http-01 challenge for nextcloud.crane.linux.srwx.net
+Using the webroot path /var/www/nextcloud for all unmatched domains.
+Waiting for verification...
+Cleaning up challenges
+
+IMPORTANT NOTES:
+ - Congratulations! Your certificate and chain have been saved at:
+   /etc/letsencrypt/live/nextcloud.crane.linux.srwx.net/fullchain.pem
+   Your key file has been saved at:
+   /etc/letsencrypt/live/nextcloud.crane.linux.srwx.net/privkey.pem
+   Your cert will expire on 2023-03-16. To obtain a new or tweaked
+   version of this certificate in the future, simply run certbot
+   again. To non-interactively renew *all* of your certificates, run
+   "certbot renew"
+ - If you like Certbot, please consider supporting our work by:
+
+   Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+   Donating to EFF:                    https://eff.org/donate-le
+
+Редактируем файл на trusted_domains в /var/www/nextcloud/config/config.php
+$CONFIG = array (
+  'passwordsalt' => 'y0RZB5vnG+wbTnKduyeuIacg2i0awf',
+  'secret' => 'KIeEEXr+8I6v4G5NLsKksVZilojVNvu0cOeMLEkp0U9kc7h6',
+  'trusted_domains' => 
+  array (
+    0 => 'localhost',
+    1 => 'nextcloud.crane.linux.srwx.net',
+
+root@crane-application:/etc/cron.d# cat nextcloud 
+*/5  *  *  *  * www-data  php -f /var/www/nextcloud/cron.php
+
+ADMINER
+mkdir /var/www/adminer
+wget https://www.adminer.org/latest.php -O /var/www/adminer/index.php --no-check-certificate
+
+Создаем базовую аутентификацию
+apt install apache2-utils
+
+Задаем пароль и пользователя
+root@crane-application:/var/www/adminer# htpasswd -c /etc/nginx/.htpasswd rebrainme
+New password: 
+Re-type new password: 
+Adding password for user rebrainme
+
+
+
+cat /etc/nginx/sites-enabled/adminer
+# Set the `immutable` cache control options only for assets with a cache busting `v` argument
+map $arg_v $asset_immutable {
+    "" "";
+    default "immutable";
+}
+
+
+
+server {
+    listen         80;
+    server_name    adminer.crane.linux.srwx.net;
+    return         301 https://$server_name$request_uri;
+}
+
+server {
+    server_name	   adminer.crane.linux.srwx.net;
+    listen    443 ssl; 
+    access_log     /var/log/nginx/adminer.access.log;
+    error_log      /var/log/nginx/adminer.error.log;
+
+    ssl_certificate /etc/letsencrypt/live/adminer.crane.linux.srwx.net/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/adminer.crane.linux.srwx.net/privkey.pem;
+
+    root           /var/www/adminer;
+    index          index.php;
+
+    auth_basic "Restricted Access";
+    auth_basic_user_file /etc/nginx/basic_auth/adminer/.htpasswd;
+
+    location / {
+#	proxy_pass adminer;
+        try_files $uri $uri/ =404;
+    }
+
+    # Make a regex exception for `/.well-known` so that clients can still
+    # access it despite the existence of the regex rule
+    # `location ~ /(\.|autotest|...)` which would otherwise handle requests
+    # for `/.well-known`.
+    location ^~ /.well-known {
+        # The rules in this block are an adaptation of the rules
+        # in `.htaccess` that concern `/.well-known`.
+
+        location = /.well-known/carddav { return 301 /remote.php/dav/; }
+        location = /.well-known/caldav  { return 301 /remote.php/dav/; }
+
+        location /.well-known/acme-challenge    { try_files $uri $uri/ =404; }
+        location /.well-known/pki-validation    { try_files $uri $uri/ =404; }
+
+        # Let Nextcloud's API for `/.well-known` URIs handle all other
+        # requests by passing them to the front-end controller.
+        return 301 /index.php$request_uri;
+    }
+
+    location ~ \.php$ {
+    	try_files $uri =404;
+    	fastcgi_split_path_info ^(.+\.php)(/.+)$;
+    #	fastcgi_pass php;
+    	fastcgi_index index.php;
+    	fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    	include fastcgi_params;
+	fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+    }
+}
+
+
+
+Получаем сертификат для Adminer
+root@crane-application:/etc/nginx/sites-enabled# certbot certonly  --webroot -w /var/www/adminer -d adminer.crane.linux.srwx.net -m m.efoshkin@rebrainme.ru
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Plugins selected: Authenticator webroot, Installer None
+Obtaining a new certificate
+Performing the following challenges:
+http-01 challenge for adminer.crane.linux.srwx.net
+Using the webroot path /var/www/adminer for all unmatched domains.
+Waiting for verification...
+Cleaning up challenges
+
+IMPORTANT NOTES:
+ - Congratulations! Your certificate and chain have been saved at:
+   /etc/letsencrypt/live/adminer.crane.linux.srwx.net/fullchain.pem
+   Your key file has been saved at:
+   /etc/letsencrypt/live/adminer.crane.linux.srwx.net/privkey.pem
+   Your cert will expire on 2023-03-16. To obtain a new or tweaked
+   version of this certificate in the future, simply run certbot
+   again. To non-interactively renew *all* of your certificates, run
+   "certbot renew"
+ - If you like Certbot, please consider supporting our work by:
+
+   Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+   Donating to EFF:                    https://eff.org/donate-le
+
+
+
+GRAYLOG
+создаем nginx сервер и серт бот
+vi /etc/nginx/sites-available/graylog
+server {
+    listen 9300;
+    server_name logz.crane.linux.srwx.net;
+
+    location / {
+         proxy_pass https://10.130.0.18:9301; # full internal address
+         proxy_http_version  1.1;
+         proxy_set_header    Host $server_name:$server_port;
+         proxy_set_header    X-Forwarded-Host $http_host;    # necessary for proper absolute redirects and TeamCity CSRF check
+         proxy_set_header    X-Forwarded-Proto $scheme;
+         proxy_set_header    X-Forwarded-For $remote_addr;
+         proxy_set_header    Upgrade $http_upgrade; # WebSocket support
+      #   proxy_set_header    Connection $connection_upgrade; # WebSocket support
+    }
+}
+
+server {
+    listen 9200;
+    server_name logz.crane.linux.srwx.net;
+
+    location / {
+         proxy_pass https://10.130.0.18:9201; # full internal address
+         proxy_http_version  1.1;
+         proxy_set_header    Host $server_name:$server_port;
+         proxy_set_header    X-Forwarded-Host $http_host;    # necessary for proper absolute redirects and TeamCity CSRF check
+         proxy_set_header    X-Forwarded-Proto $scheme;
+         proxy_set_header    X-Forwarded-For $remote_addr;
+         proxy_set_header    Upgrade $http_upgrade; # WebSocket support
+      #   proxy_set_header    Connection $connection_upgrade; # WebSocket support
+    }
+}
+
+server {
+    listen         80;
+    server_name    logz.crane.linux.srwx.net;
+    return         301 https://$server_name$request_uri;
+}
+
+server
+{
+    listen 443 ssl;
+    server_name logz.crane.linux.srwx.net; 
+    access_log     /var/log/nginx/graylog.access.log;
+    error_log      /var/log/nginx/graylog.error.log;
+
+    ssl_certificate  /etc/letsencrypt/live/logz.crane.linux.srwx.net/fullchain.pem;
+    ssl_certificate_key  /etc/letsencrypt/live/logz.crane.linux.srwx.net/privkey.pem;
+    auth_basic "Restricted Access";
+    auth_basic_user_file /etc/nginx/basic_auth/graylog/.htpasswd;
+   location / {
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Server $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Graylog-Server-URL http://$server_name/;
+      proxy_pass       http://10.130.0.18:9001;
+    }
+
+   location ^~ /.well-known {
+        root /var/www/graylog;
+        default_type text/plain;
+        # The rules in this block are an adaptation of the rules
+        # in `.htaccess` that concern `/.well-known`.
+
+        location = /.well-known/carddav { return 301 /remote.php/dav/; }
+        location = /.well-known/caldav  { return 301 /remote.php/dav/; }
+
+        location /.well-known/acme-challenge    { try_files $uri $uri/ =404; }
+        location /.well-known/pki-validation    { try_files $uri $uri/ =404; }
+
+        # Let Nextcloud's API for `/.well-known` URIs handle all other
+        # requests by passing them to the front-end controller.
+        return 301 /index.php$request_uri;
+    }
+}
+
+root@crane-application:/etc/nginx/sites-enabled# certbot certonly --webroot -w /var/www/graylog -d logz.crane.linux.srwx.net -m m.efoshkin@rebrainme.ru
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Plugins selected: Authenticator webroot, Installer None
+Obtaining a new certificate
+Performing the following challenges:
+http-01 challenge for logz.crane.linux.srwx.net
+Using the webroot path /var/www/graylog for all unmatched domains.
+Waiting for verification...
+Cleaning up challenges
+
+IMPORTANT NOTES:
+ - Congratulations! Your certificate and chain have been saved at:
+   /etc/letsencrypt/live/logz.crane.linux.srwx.net/fullchain.pem
+   Your key file has been saved at:
+   /etc/letsencrypt/live/logz.crane.linux.srwx.net/privkey.pem
+   Your cert will expire on 2023-03-17. To obtain a new or tweaked
+   version of this certificate in the future, simply run certbot
+   again. To non-interactively renew *all* of your certificates, run
+   "certbot renew"
+ - If you like Certbot, please consider supporting our work by:
+
+   Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+   Donating to EFF:                    https://eff.org/donate-le
+
+
+
+Basic Auth
+ htpasswd -c /etc/nginx/basic_auth/graylog/.htpasswd rebrainme
+ logz
+
+Prometheus
+vi /etc/nginx/sites-available/prometheus
+#server {
+#    listen         80;
+#    server_name    logz.crane.linux.srwx.net;
+#    return         301 https://$server_name$request_uri;
+#}
+
+server
+{
+    listen 80;
+   # listen 443 ssl;
+    server_name prometheus.crane.linux.srwx.net; 
+    access_log     /var/log/nginx/prometheus.access.log;
+    error_log      /var/log/nginx/prometheus.error.log;
+
+   # ssl_certificate  /etc/letsencrypt/live/logz.crane.linux.srwx.net/fullchain.pem;
+   # ssl_certificate_key  /etc/letsencrypt/live/logz.crane.linux.srwx.net/privkey.pem;
+   # auth_basic "Restricted Access";
+   # auth_basic_user_file /etc/nginx/basic_auth/graylog/.htpasswd;
+   location / {
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Server $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Prometheus-Server-URL http://$server_name/;
+      proxy_pass       http://10.130.0.18:9090;
+    }
+
+   location ^~ /.well-known {
+        root /var/www/graylog;
+        default_type text/plain;
+        # The rules in this block are an adaptation of the rules
+        # in `.htaccess` that concern `/.well-known`.
+
+        location = /.well-known/carddav { return 301 /remote.php/dav/; }
+        location = /.well-known/caldav  { return 301 /remote.php/dav/; }
+
+        location /.well-known/acme-challenge    { try_files $uri $uri/ =404; }
+        location /.well-known/pki-validation    { try_files $uri $uri/ =404; }
+
+        # Let Nextcloud's API for `/.well-known` URIs handle all other
+        # requests by passing them to the front-end controller.
+        return 301 /index.php$request_uri;
+    }
+}
+
+systemctl restart nginx
+mkdir /var/www/prometheus
+cd /var/www
+chown www-data:www-data prometheus/
+
+
+certbot certonly --webroot -w /var/www/prometheus -d prometheus.crane.linux.srwx.net -m m.efoshkin@rebrainme.ru
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Plugins selected: Authenticator webroot, Installer None
+Obtaining a new certificate
+Performing the following challenges:
+http-01 challenge for prometheus.crane.linux.srwx.net
+Using the webroot path /var/www/prometheus for all unmatched domains.
+Waiting for verification...
+Cleaning up challenges
+
+IMPORTANT NOTES:
+ - Congratulations! Your certificate and chain have been saved at:
+   /etc/letsencrypt/live/prometheus.crane.linux.srwx.net/fullchain.pem
+   Your key file has been saved at:
+   /etc/letsencrypt/live/prometheus.crane.linux.srwx.net/privkey.pem
+   Your cert will expire on 2023-03-17. To obtain a new or tweaked
+   version of this certificate in the future, simply run certbot
+   again. To non-interactively renew *all* of your certificates, run
+   "certbot renew"
+ - If you like Certbot, please consider supporting our work by:
+
+   Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+   Donating to EFF:                    https://eff.org/donate-le
+
+mkdir /etc/nginx/basic_auth/prometheus
+Basic Auth
+ htpasswd -c /etc/nginx/basic_auth/prometheus/.htpasswd rebrainme
+ prometheus
+
+
+Grafana
+mkdir /var/www/grafana
+chown www-data:www-data /var/www/grafana/
+ln -s ../sites-available/grafana
+vi /etc/nginx/sites-available/grafana
+server {
+    listen         80;
+    server_name    grafana.crane.linux.srwx.net;
+    return         301 https://$server_name$request_uri;
+}
+
+server
+{
+#    listen 80;
+    listen 443 ssl;
+    server_name grafana.crane.linux.srwx.net; 
+    access_log     /var/log/nginx/grafana.access.log;
+    error_log      /var/log/nginx/grafana.error.log;
+
+    ssl_certificate  /etc/letsencrypt/live/grafana.crane.linux.srwx.net/fullchain.pem;
+    ssl_certificate_key  /etc/letsencrypt/live/grafana.crane.linux.srwx.net/privkey.pem;
+    auth_basic "Restricted Access";
+    auth_basic_user_file /etc/nginx/basic_auth/grafana/.htpasswd;
+   location / {
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Server $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#      proxy_set_header X-Prometheus-Server-URL http://$server_name/;
+      proxy_pass       http://10.130.0.18:3000;
+    }
+
+   location ^~ /.well-known {
+        root /var/www/grafana;
+        default_type text/plain;
+        # The rules in this block are an adaptation of the rules
+        # in `.htaccess` that concern `/.well-known`.
+
+        location = /.well-known/carddav { return 301 /remote.php/dav/; }
+        location = /.well-known/caldav  { return 301 /remote.php/dav/; }
+
+        location /.well-known/acme-challenge    { try_files $uri $uri/ =404; }
+        location /.well-known/pki-validation    { try_files $uri $uri/ =404; }
+
+        # Let Nextcloud's API for `/.well-known` URIs handle all other
+        # requests by passing them to the front-end controller.
+        return 301 /index.php$request_uri;
+    }
+}
+
+
+
+
+systemctl restart nginx
+certbot certonly --webroot -w /var/www/grafana -d grafana.crane.linux.srwx.net -m m.efoshkin@rebrainme.ru
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Plugins selected: Authenticator webroot, Installer None
+Obtaining a new certificate
+Performing the following challenges:
+http-01 challenge for grafana.crane.linux.srwx.net
+Using the webroot path /var/www/grafana for all unmatched domains.
+Waiting for verification...
+Cleaning up challenges
+
+IMPORTANT NOTES:
+ - Congratulations! Your certificate and chain have been saved at:
+   /etc/letsencrypt/live/grafana.crane.linux.srwx.net/fullchain.pem
+   Your key file has been saved at:
+   /etc/letsencrypt/live/grafana.crane.linux.srwx.net/privkey.pem
+   Your cert will expire on 2023-03-17. To obtain a new or tweaked
+   version of this certificate in the future, simply run certbot
+   again. To non-interactively renew *all* of your certificates, run
+   "certbot renew"
+ - If you like Certbot, please consider supporting our work by:
+
+   Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+   Donating to EFF:                    https://eff.org/donate-le
+
+
+mkdir /etc/nginx/basic_auth/grafana
+Basic Auth
+ htpasswd -c /etc/nginx/basic_auth/grafana/.htpasswd rebrainme
+ grafana
+ 
+ 
+*********************************************************
+DATABASE MariaDB
+*********************************************************
+ssh 10.130.0.5
+sudo su
+apt update
+
+systemctl enable mariadb
+systemctl start mariadb
+mysqladmin -u root password
+root
+mysql -uroot -p
+CREATE DATABASE nextcloud DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_general_ci;
+GRANT ALL PRIVILEGES ON nextcloud.* TO nextcloud@localhost IDENTIFIED BY 'nextclouddatabasepassword';
+GRANT ALL PRIVILEGES ON nextcloud.* TO nextcloud@'%' IDENTIFIED BY 'nextclouddatabasepassword';
+
+CREATE DATABASE grafana DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_general_ci;
+GRANT ALL PRIVILEGES ON grafana.* TO grafana@localhost IDENTIFIED BY 'grafanadatabasepassword';
+GRANT ALL PRIVILEGES ON grafana.* TO grafana@'%' IDENTIFIED BY 'grafanadatabasepassword';
+
+
+mkdir /mnt/storage
+apt install nfs-common
+
+Поправил путь хранения базы
+vi 50-server.cnf 
+datadir                 = /mnt/storage
+
+root@crane-database:/etc/systemd/system# cat mnt-storage.mount 
+[Unit]
+Description=Database storage mount
+After=network.target
+[Mount]
+What=10.130.0.23:/mnt/mariadb
+Where=/mnt/storage
+Type=nfs4
+Options=rw,defaults
+DirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
+
+Устанавливаем базу слушать на публичном айпи адресе.
+pwd
+/etc/mysql/mariadb.conf.d
+vi 50-server.cnf 
+root@crane-database:/etc/mysql/mariadb.conf.d# grep bind 50-server.cnf 
+bind-address            = 10.130.0.5
+
+
+***************************************************
+STORAGE
+***************************************************
+apt update
+apt install nfs-kernel-server nfs-common
+
+apt install xfsprogs
+root@crane-storage:/home/ubuntu# lsblk -f
+NAME   FSTYPE LABEL UUID                                 FSAVAIL FSUSE% MOUNTPOINT
+vda                                                                     
+├─vda1                                                                  
+└─vda2 ext4         89cd8cb5-30ee-4ae8-9dff-7757266aa8d9    7.4G    20% /
+vdb                                                                     
+└─vdb1 xfs          e97cbb77-30f7-4ecd-8e8a-e2c2e37b3e2e                
+vdc                                                                     
+└─vdc1 xfs          799c3952-6128-45ed-96ad-837a7d02cf33                
+vdd                                                                     
+└─vdd1 xfs          ec09f00d-6fa7-4cf3-a62b-93a30b5daae9                
+vde                                                                     
+└─vde1 xfs          7b34260d-0c07-4f94-8cea-fca975f485b0  
+
+Добавил монтирование хранилища в /mnt/mariadb
+UUID=e97cbb77-30f7-4ecd-8e8a-e2c2e37b3e2e /mnt/mariadb   xfs  defaults 0 0
+mount -a
+
+sudo systemctl restart nfs-kernel-server
+
+Добавляем пользователя mariadb для доступа е nfs шаре.
+useradd -s /bin/false mariadb -p mariaDB_pass
+
+Смотрим uid gid пользователя под которым работает mysql
+root@crane-database:/mnt# cat /etc/passwd | grep mysql
+mysql:x:109:115:MySQL Server,,,:/nonexistent:/bin/false
+
+Даем права этому пользователю на storage
+chown 109:115 mariadb/
+
+mkdir /mnt/nextcloud_data
+chown 33:33 /mnt/nextcloud_data/
+Добавляем права для проверки записи. 
+chmod o+w nextcloud_data/
+Убираем 
+chmod o-w nextcloud_data/
+
+vi /etc/fstab
+UUID=799c3952-6128-45ed-96ad-837a7d02cf33 /mnt/nextcloud_data xfs defaults 0 0
+mount -a
+vi /etc/exports
+/mnt/nextcloud_data 10.130.0.36/24(rw,async,no_subtree_check)
+mount -a
+sudo systemctl restart nfs-kernel-server
+
+
+Adding the elastic storage
+mkdir /mnt/elastic_data
+UUID=ec09f00d-6fa7-4cf3-a62b-93a30b5daae9 /mnt/elastic_data  xfs defaults 0 0
+vi /etc/exports
+/mnt/elastic_data 10.130.0.18/24(rw,async,no_subtree_check)
+Проверяем uid gid пользователя эластик
+root@crane-monitoring:/etc/elasticsearch# cat /etc/passwd | grep elastic
+elasticsearch:x:109:115::/nonexistent:/bin/false
+Даем нужные права
+chown 109:115 elastic_data/
+
+Правим путь хранения данных для эластика
+path.data: /mnt/elastic_data
+
+
+Хранилище для прометея
+mkdir prometheus_data
+vi /etc/fstab 
+UUID=7b34260d-0c07-4f94-8cea-fca975f485b0 /mnt/prometheus_data xfs defaults 0 0
+mount -a
+vi /etc/exports
+/mnt/prometheus_data 10.130.0.18/24(rw,async,no_subtree_check)
+sudo systemctl restart nfs-kernel-server
+
+**********************************************************
+MONITORING
+**********************************************************
+Elastic
+scp elasticsearch-7.10.1-amd64.deb yc-user@10.130.0.18:~
+dpkg -i elasticsearch-7.10.1-amd64.deb
+systemctl enable --now elasticsearch
+##### config settings
+sudo tee -a /etc/elasticsearch/elasticsearch.yml > /dev/null <<EOT
+cluster.name: graylog
+action.auto_create_index: false
+EOT
+
+MongoDB
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 9DA31620334BD75D9DCB49F368818C72E52529D4
+echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.0.list
+sudo apt-get update
+sudo apt-get install -y mongodb-org
+sudo systemctl daemon-reload
+sudo systemctl enable mongod.service
+sudo systemctl restart mongod.service
+sudo systemctl --type=service --state=active | grep mongod
+
+Java
+sudo apt-get update && sudo apt-get upgrade
+sudo apt-get install apt-transport-https openjdk-11-jre-headless uuid-runtime pwgen
+
+Graylog
+sudo apt-get install apt-transport-https
+wget https://packages.graylog2.org/repo/packages/graylog-4.3-repository_latest.deb
+sudo dpkg -i graylog-4.3-repository_latest.deb
+sudo apt-get update
+sudo apt-get install graylog-server
+sudo systemctl enable --now graylog-server
+
+
+
+Пароль
+root@epd1ffli3q3seo7sc5jh:/home/yc-user# echo -n "Enter Password: " && head -1 </dev/stdin | tr -d '\n' | sha256sum | cut -d" " -f1
+Enter Password: logz
+313e33da82482f146845961e8b7fcbf1678f3b98fdff5609b681d0483c36c5db
+
+vi /etc/graylog/server/server.conf
+root_password_sha2 = 313e33da82482f146845961e8b7fcbf1678f3b98fdff5609b681d0483c36c5db
+password_secret = 313e33da82482f146845961e8b7fcbf1678f3b98fdff5609b681d0483c36c5db
+
+Установка проксирования
+nginx
+apt-get install nginx
+systemctl enable nginx
+systemctl start nginx
+vi /etc/nginx/sites-available/graylog
+
+server {
+    listen 80;
+    server_name 10.130.0.18;
+
+    location / {
+         proxy_pass http://127.0.0.1:5601; # full internal address
+         proxy_http_version  1.1;
+         proxy_set_header    Host $server_name:$server_port;
+         proxy_set_header    X-Forwarded-Host $http_host;    # necessary for proper absolute redirects and TeamCity CSRF check
+         proxy_set_header    X-Forwarded-Proto $scheme;
+         proxy_set_header    X-Forwarded-For $remote_addr;
+         proxy_set_header    Upgrade $http_upgrade; # WebSocket support
+      #   proxy_set_header    Connection $connection_upgrade; # WebSocket support
+    }
+}
+
+server {
+    listen 9301;
+    server_name 10.130.0.18;
+
+    location / {
+         proxy_pass https://127.0.0.1:9300; # full internal address
+         proxy_http_version  1.1;
+         proxy_set_header    Host $server_name:$server_port;
+         proxy_set_header    X-Forwarded-Host $http_host;    # necessary for proper absolute redirects and TeamCity CSRF check
+         proxy_set_header    X-Forwarded-Proto $scheme;
+         proxy_set_header    X-Forwarded-For $remote_addr;
+         proxy_set_header    Upgrade $http_upgrade; # WebSocket support
+      #   proxy_set_header    Connection $connection_upgrade; # WebSocket support
+    }
+}
+
+server {
+    listen 9201;
+    server_name 10.130.0.18;
+
+    location / {
+         proxy_pass https://127.0.0.1:9200; # full internal address
+         proxy_http_version  1.1;
+         proxy_set_header    Host $server_name:$server_port;
+         proxy_set_header    X-Forwarded-Host $http_host;    # necessary for proper absolute redirects and TeamCity CSRF check
+         proxy_set_header    X-Forwarded-Proto $scheme;
+         proxy_set_header    X-Forwarded-For $remote_addr;
+         proxy_set_header    Upgrade $http_upgrade; # WebSocket support
+      #   proxy_set_header    Connection $connection_upgrade; # WebSocket support
+    }
+}
+
+server
+{
+    listen 9001 default_server;
+    server_name 10.130.0.18; 
+
+   location / {
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Server $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Graylog-Server-URL http://$server_name/;
+      proxy_pass       http://127.0.0.1:9000;
+    }
+}
+
+cd ../sites-enabled
+ln -s ../sites-available/graylog
+
+Storage for elastic
+mkdir /mnt/elastic_data
+vi /etc/systemd/system/mnt-elastic_data.mount
+[Unit]
+Description=Elastic storage mount
+After=network.target
+[Mount]
+What=10.130.0.23:/mnt/elastic_data
+Where=/mnt/elastic_data
+Type=nfs4
+Options=rw,defaults
+DirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
+
+systemctl enable --now mnt-elastic_data.mount
+
+
+vi /etc/elasticsearch/elasticsearch.yml
+-XX:HeapDumpPath=/mnt/elastic_data
+
+Настройка ротации логов
+enabled_index_rotation_strategies = time
+rotation_strategy = time
+elasticsearch_max_time_per_index = 7d
+systemctl restart graylog-server
+
+
+
+
+Prometheus
+wget https://github.com/prometheus/prometheus/releases/download/v2.38.0/prometheus-2.38.0.linux-amd64.tar.gz
+
+tar xvfz prometheus-*.tar.gz
+cd /opt
+mv prometheus-2.38.0.linux-amd64 prometheus
+cd prometheus
+
+
+# Создаем папки
+root@epdombki3acau4pu2nq8:/home/yc-user# mkdir /etc/prometheus
+
+
+# Копируем в созданные папки
+root@epdombki3acau4pu2nq8:/opt/prometheus-2.38.0.linux-amd64# cp prometheus promtool /usr/local/bin
+root@epdombki3acau4pu2nq8:/opt/prometheus-2.38.0.linux-amd64# cp -r console_libraries consoles prometheus.yml /etc/prometheus/
+
+# Создаем пользователя и даем права ему
+useradd --no-create-home --shell /bin/false prometheus
+chown -R prometheus:prometheus /etc/prometheus 
+
+root@crane-monitoring:/mnt# cat /etc/passwd | grep prometheus
+prometheus:x:1001:1002::/home/prometheus:/bin/false
+root@crane-storage:/mnt# chown -R 1001:1002 prometheus_data/
+root@crane-monitoring:/mnt# ll 
+drwxr-xr-x  3 elasticsearch elasticsearch   19 Dec 17 11:00 elastic_data/
+drwxr-xr-x  2 prometheus    prometheus       6 Dec 16 07:25 prometheus_data/
+
+chown prometheus:prometheus /usr/local/bin/{prometheus,promtool}
+
+
+
+mkdir /mnt/prometheus_data
+vi /etc/systemd/system/mnt-prometheus_data.mount
+[Unit]
+Description=Prometheus storage mount
+After=network.target
+[Mount]
+What=10.130.0.23:/mnt/prometheus_data
+Where=/mnt/prometheus_data
+Type=nfs4
+Options=rw,defaults
+DirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
+
+systemctl enable --now mnt-prometheus_data.mount
+
+# Запуск и проверка
+/usr/local/bin/prometheus --config.file /etc/prometheus/prometheus.yml --storage.tsdb.path /mnt/prometheus_data/ --web.console.templates=/etc/prometheus/consoles --web.console.libraries=/etc/prometheus/console_libraries
+
+# Создаем юнит systemd
+vi /etc/systemd/system/prometheus.service
+[Unit]
+Description=Prometheus Service
+After=network.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+ExecStart=/usr/local/bin/prometheus \
+--config.file /etc/prometheus/prometheus.yml \
+--storage.tsdb.path /mnt/prometheus_data/ \
+--web.console.templates=/etc/prometheus/consoles \
+--web.console.libraries=/etc/prometheus/console_libraries
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+systemctl daemon-reload
+systemctl enable --now prometheus
+
+
+
+Установка Графаны
+scp grafana-* ubuntu@
+sudo dpkg -i grafana-enterprise_9.1.1_amd64.deb
+sudo systemctl daemon-reload
+sudo systemctl enable --now grafana-server.service
+
+Ставим базу данных графана
+vi /etc/grafana/grafana.ini
+[database]
+# You can configure the database connection by specifying type, host, name, user and password
+# as separate properties or as on string using the url properties.
+
+# Either "mysql", "postgres" or "sqlite3", it's your choice
+type = mysql
+host = 10.130.0.5:3306
+name = grafana
+user = grafana
+# If the password contains # or ; you have to wrap it with triple quotes. Ex """#password;"""
+password = grafanada
+
+
+
+Ставим node-exporter везде
+mkdir /opt/node-exporter
+cd /opt/node-exporter
+wget https://github.com/prometheus/node_exporter/releases/download/v1.0.1/node_exporter-1.0.1.linux-amd64.tar.gz
+tar zxvf node_exporter-*.linux-amd64.tar.gz
+cd node_exporter-1.0.1.linux-amd64
+cp node_exporter /usr/local/bin/
+
+useradd --no-create-home --shell /bin/false nodeusr
+chown -R nodeusr:nodeusr /usr/local/bin/node_exporter
+
+vi /etc/systemd/system/node_exporter.service
+[Unit]
+Description=Node Exporter Service
+After=network.target
+
+[Service]
+User=nodeusr
+Group=nodeusr
+Type=simple
+ExecStart=/usr/local/bin/node_exporter --web.listen-address=:60000
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+systemctl daemon-reload
+systemctl enable node_exporter
+systemctl start node_exporter
+systemctl status node_exporter
+
+Добавляем нод экспортеры в прометеус
+root@crane-monitoring:/etc/prometheus# cat prometheus.yml 
+# my global config
+global:
+  scrape_interval: 15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: "prometheus"
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: 'node_exporter_application'
+    scrape_interval: 5s
+    static_configs: 
+        - targets: ['10.130.0.36:9100']
+
+  - job_name: 'node_exporter_database'
+    scrape_interval: 5s
+    static_configs: 
+        - targets: ['10.130.0.5:9100']
+
+  - job_name: 'node_exporter_monitoring'
+    scrape_interval: 5s
+    static_configs: 
+        - targets: ['10.130.0.18:9100']
+
+  - job_name: 'node_exporter_storage'
+    scrape_interval: 5s
+    static_configs: 
+        - targets: ['10.130.0.23:9100']
+        
+Rsyslog
+For nextcloud
+vi 60-nextcloud.conf
+module(load="imfile" PollingInterval="10") #needs to be done just once
+# File 1
+input(type="imfile"
+      File="/mnt/nextcloud_data/nextcloud.log"
+      Tag="nextcloud"
+      Severity="info"
+      Facility="local7")
+local7.*                             @10.130.0.18:55514;RSYSLOG_SyslogProtocol23Format
+
+Mariadb
+
+
+NFS
+if $programname == 'nfsd' or $msg contains 'nfs' and $syslogseverity <=6 then  /var/log/nfs.log
+module(load="imfile" PollingInterval="10") #needs to be done just once
+
+# File 1
+input(type="imfile"
+      File="/var/log/nfs.log"
+      Tag="nfs"
+      Severity="info"
+      Facility="local6")
+local6.*                             @10.130.0.18:55517;RSYSLOG_SyslogProtocol23Format
+
+Prometheus
+if $programname == 'prometheus' or $msg contains 'prometheus' and $syslogseverity <=6 then           @10.130.0.18:55518;RSYSLOG_SyslogProtocol23Format
+
+Graylog
+module(load="imfile" PollingInterval="10") #needs to be done just once
+# File 1
+input(type="imfile"
+      File="/var/log/graylog-server/server.log"
+      Tag="graylog"
+      Severity="info"
+      Facility="local7")
+local7.*                             @10.130.0.18:55519;RSYSLOG_SyslogProtocol23Format
+
+Nginx
+module(load="imfile" PollingInterval="10") #needs to be done just once
+# File 1
+input(type="imfile"
+      File="/var/log/nginx/access.log"
+      Tag="nextcloud"
+      Severity="info"
+      Facility="local7")
+input(type="imfile"
+      File="/var/log/nginx/error.log"
+      Tag="nextcloud"
+      Severity="info"
+      Facility="local6")
+input(type="imfile"
+      File="/var/log/nginx/adminer.access.log"
+      Tag="adminer"
+      Severity="info"
+      Facility="local7")
+input(type="imfile"
+      File="/var/log/nginx/adminer.error.log"
+      Tag="adminer"
+      Severity="info"
+      Facility="local6")
+input(type="imfile"
+      File="/var/log/nginx/grafana.access.log"
+      Tag="grafana"
+      Severity="info"
+      Facility="local7")
+input(type="imfile"
+      File="/var/log/nginx/grafana.error.log"
+      Tag="grafana"
+      Severity="info"
+      Facility="local6")
+input(type="imfile"
+      File="/var/log/nginx/graylog.access.log"
+      Tag="graylog"
+      Severity="info"
+      Facility="local7")
+input(type="imfile"
+      File="/var/log/nginx/graylog.error.log"
+      Tag="graylog"
+      Severity="info"
+      Facility="local6")
+input(type="imfile"
+      File="/var/log/nginx/prometheus.access.log"
+      Tag="prometheus"
+      Severity="info"
+      Facility="local7")
+input(type="imfile"
+      File="/var/log/nginx/prometheus.error.log"
+      Tag="prometheus"
+      Severity="info"
+      Facility="local6")
+input(type="imfile"
+      File="/var/log/nginx/nextcloud.access.log"
+      Tag="nextcloud"
+      Severity="info"
+      Facility="local7")
+input(type="imfile"
+      File="/var/log/nginx/nextcloud.error.log"
+      Tag="nextcloud"
+      Severity="info"
+      Facility="local6")
+
+local7.*                             @10.130.0.18:55520;RSYSLOG_SyslogProtocol23Format
+local6.*                             @10.130.0.18:55521;RSYSLOG_SyslogProtocol23Format
+
+Cron
+ if $programname == 'cron' or $programname == 'CRON' or $msg contains 'cron' or $msg contains 'CRON' and $syslogseverity <=6 then           @10.130.0.18:55522;RSYSLOG_SyslogProtocol23Format
+                                                                            
+
+```
+
+
+
+Ответ
+Результат 47 из 50
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 47
+18.12.2022 20:28
+Добрый день!
+
+Поздравляем с завершением Практиума Linux Advanced и успешной защитой финального проекта, все реализовано в полном объеме, хорошо что детально разбирались с деталями и искали собственные пути решения, сертификат будет доступен в личном кабинете, желаем дальнейших успехов!
+
+По итогам обсуждения реализации проекта и вопросам рекомендованы статьи:
+
+https://habr.com/ru/post/281272/
+https://ru.admininfo.info/ver-qu-proceso-y-qui-n-est-usando-un-archivo-linux
+https://andreyex.ru/linux/komandy-linux-i-komandy-shell/7-primerov-komandy-lsof-v-linux/
+https://gist.github.com/justinhartman/79c527076ce7cc740423eb92b5600d52
+https://bobcares.com/blog/ertbot-auto-restart-nginx/
+
+
+
