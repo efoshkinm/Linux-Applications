@@ -1,0 +1,188 @@
+Задание:
+Настройте вашу систему так, чтобы все логи из journald отправлялись демону syslog (в зависимости от того, что по умолчанию поставляет дистрибутив).
+Выведите последние 10 строк из файла /var/log/auth.log (команду и вывод сохраните).
+На проверку отправьте сохраненные выводы команд и конфигурационный файл journald (с его путем в системе) с комментариями, что было изменено (или не изменено) и по какой причине.
+
+****************************************************************************
+Решение
+****************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+31.08.2022 09:49
+После прочтения материала, я установил у себя два пункта в journald.conf:
+
+[root@MiWiFi-R4A-srv systemd]# cat /etc/systemd/journald.conf | grep -v '#'
+
+[Journal]
+Storage=persistent
+ForwardToSyslog=yes
+[root@MiWiFi-R4A-srv systemd]# 
+
+
+Так же я в настройке системы в systemd сделал следующие изменения чтобы включить больше логов.
+[root@MiWiFi-R4A-srv systemd]# cat /etc/systemd/system.conf | grep -v '#'
+
+[Manager]
+LogLevel=info
+LogTarget=journal-or-kmsg
+LogColor=yes
+LogLocation=yes
+LogTime=yes
+DumpCore=yes
+ShowStatus=yes
+CrashShell=yes
+[root@MiWiFi-R4A-srv systemd]# 
+
+2. Выведите последние 10 строк из файла /var/log/auth.log (команду и вывод сохраните).
+На моей машине не было этого файла. У меня федора. Был аудит.
+
+[root@MiWiFi-R4A-srv audit]# tail /var/log/audit/audit.log 
+type=SERVICE_STOP msg=audit(1661927210.098:355): pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=fprintd comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"
+type=BPF msg=audit(1661927210.109:356): prog-id=0 op=UNLOAD
+type=SERVICE_START msg=audit(1661927269.517:357): pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=dnf-makecache comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"
+type=SERVICE_STOP msg=audit(1661927269.517:358): pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=dnf-makecache comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"
+type=BPF msg=audit(1661928046.211:359): prog-id=94 op=LOAD
+type=BPF msg=audit(1661928046.211:360): prog-id=95 op=LOAD
+type=SERVICE_START msg=audit(1661928046.259:361): pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=systemd-hostnamed comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"
+type=SERVICE_STOP msg=audit(1661928076.274:362): pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=systemd-hostnamed comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"
+type=BPF msg=audit(1661928076.325:363): prog-id=0 op=UNLOAD
+type=BPF msg=audit(1661928076.325:364): prog-id=0 op=UNLOAD
+[root@MiWiFi-R4A-srv audit]#
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+НА ДОРАБОТКЕ 3
+31.08.2022 21:28
+Здравствуйте!
+
+Вы уверены что ForwardToSyslog=yes действительно необходимо ?
+п.2 требуется чтобы подтвердить что логи действительно пишутся в формате sysylog. Файл аудита это вообще не то. Либо разберитесь как сделать то же самое на федоре, или просто сделайте задание на Ubuntu.
+06.09.2022 10:11
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+06.09.2022 10:11
+1. Настройте вашу систему так, чтобы все логи из journald отправлялись демону syslog (в зависимости от того, что по умолчанию поставляет дистрибутив).
+У меня есть локально система Oracle Linux и там есть автоматическое подтягивание логов из journald 
+А на убунте нет. РАздел модулей выглядит так:
+#################
+#### MODULES ####
+#################
+
+module(load="imuxsock") # provides support for local system logging
+#module(load="immark")  # provides --MARK-- message capability
+
+# provides UDP syslog reception
+#module(load="imudp")
+#input(type="imudp" port="514")
+
+# provides TCP syslog reception
+#module(load="imtcp")
+#input(type="imtcp" port="514")
+
+# provides kernel logging support and enable non-kernel klog messages
+module(load="imklog" permitnonkernelfacility="on")
+
+
+На убунте можно либо добавить модуль либо включить отправку на journalctl
+Module:
+module(load="imjournal" 	    # provides access to the systemd journal
+       StateFile="imjournal.state") # File to store the position in the journal
+
+Я добавил настройку в journald
+Journald settings:
+root@epdavvtit50vgk6hbnkn:/etc# cat /etc/systemd/journald.conf | grep -v '#'
+[Journal]
+Storage=persistent
+ForwardToSyslog=yes
+
+
+2. Выведите последние 10 строк из файла /var/log/auth.log (команду и вывод сохраните).
+root@epdavvtit50vgk6hbnkn:/etc# tail /var/log/auth.log
+Sep  6 06:45:46 epdavvtit50vgk6hbnkn sshd[24058]: error: kex_exchange_identification: banner line contains invalid characters
+Sep  6 06:45:53 epdavvtit50vgk6hbnkn sshd[24059]: error: kex protocol error: type 30 seq 1 [preauth]
+Sep  6 06:45:58 epdavvtit50vgk6hbnkn sshd[24059]: Connection reset by 164.52.24.169 port 58160 [preauth]
+Sep  6 06:56:31 epdavvtit50vgk6hbnkn sshd[24071]: Accepted publickey for yc-user from 178.140.46.78 port 33114 ssh2: RSA SHA256:OgpPR+cxdp6odgDHh+HGdv95+JpWB1q6afehtU3H9wk
+Sep  6 06:56:31 epdavvtit50vgk6hbnkn sshd[24071]: pam_unix(sshd:session): session opened for user yc-user by (uid=0)
+Sep  6 06:56:31 epdavvtit50vgk6hbnkn systemd-logind[525]: New session 5 of user yc-user.
+Sep  6 06:56:33 epdavvtit50vgk6hbnkn sudo:  yc-user : TTY=pts/1 ; PWD=/home/yc-user ; USER=root ; COMMAND=/usr/bin/su
+Sep  6 06:56:33 epdavvtit50vgk6hbnkn sudo: pam_unix(sudo:session): session opened for user root by yc-user(uid=0)
+Sep  6 06:56:33 epdavvtit50vgk6hbnkn su: (to root) yc-user on pts/1
+Sep  6 06:56:33 epdavvtit50vgk6hbnkn su: pam_unix(su:session): session opened for user root by yc-user(uid=0)
+root@epdavvtit50vgk6hbnkn:/etc# 
+
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 5
+06.09.2022 20:32
+Добрый день, очень хорошо что разобрались. Вообще ForwardToSyslog=yes предназначена для старых версий syslog, которые не умеют сами читать журнал, у вас rsyslog, он умеет.
+
+
+
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+LNXA-06 02: Logging. Syslog
+Описание:
+В этом задании мы разберем одно из стандартных средств логирования, пришедшее в Linux из BSD систем, — syslog. Мы рассмотрим, что это за утилита, разберем одноименный и напрямую связанный с ней протокол и его текущее состояние в реалиях всемогущего systemd (точнее journald).
+
+syslog — это стандарт отправки журналов событий (далее — логов) по сети (или по Unix-сокету /var/log). Формат стандарта подразумевает отправку простых текстовых сообщений с указанием важности (severity), субьекта (facility) и времени события, на базе которых можно производить маршрутизацию сообщений на стороне syslog-сервера, который принимает сообщения.
+
+Сервер syslog способен, как можно догадаться по работе по протоколу IP, принимать сообщения как на отдельно взятой машине (часто именно так реализуется сбор логов с древних времен даже на домашнем оборудовании), так и на удаленном сервере, что чаще используется в крупных сетях, где требуется централизованный доступ к логам для удобства администрирования инфраструктуры.
+
+Этот протокол свою историю начинает из другой операционной системы BSD, а точнее — утилиты sendmail, созданной Эриком Оллманом для сбора логов работы утилиты, а позднее стандартизированной. Протокол по умолчанию работает по порту 514, однако со временем начали использовать и другие порты, что отчасти связано с шифрованием протокола. Протокол настолько распространен, что отправка логов таким методом поддерживается практически в любом оборудовании, начиная от домашних компьютеров, заканчивая серверами и сетевым оборудованием (практически любого производителя).
+
+Разберем немного детальнее понятие важности сообщений — этот параметр используется для определения, насколько важно конкретное сообщение. Протокол определяет несколько уровней важности, каждому из которых соответствует свой код:
+
+0 — (Emergency) система не работоспособна — возникает в случае серьезных проблем с ядром, может приводить к kernel panic;
+1 — (Alert) система требует немедленного вмешательства — проблема в одной из важных подсистем ядра (к примеру, управления памятью);
+2 — (Critical) состояние системы критическое — может возникать при смерти пользовательских приложений по неожиданным причинам;
+3 — (Error) сообщения об ошибках — ошибки работы приложений, которые не ведут к неожиданному окончанию работы;
+4 — (Warning) предупреждения о возможных проблемах;
+5 — (Notice) сообщения о нормальных, но важных событиях;
+6 — (Informational) информационные сообщения;
+7 — (Debug) отладочные сообщения.
+Вторым критерием, который используется для маршрутизации сообщений, является понятие субъекта — типа программы, который шлет запрос. Как и важность, субъект определяется кодом (ввиду довольно ограниченного списка ключевых подсистем в прошлом):
+
+0 — ядро операционной системы
+1 — программное обеспечение пользователя
+2 — почтовая система
+3 — системные службы (daemons)
+4 — сообщения безопасности (авторизации)
+5 — собственные сообщения syslogd
+6 — подсистема печати
+7 — подсистема новостных групп (телеконференций, NNTP)
+8 — подсистема UUCP
+9 — службы времени
+10 — сообщения безопасности (авторизации)
+11 — служба FTP
+12 — подсистема NTP
+13 — журнал аудита
+14 — аварийный журнал
+15 — периодические задачи
+16-23 — локальный 0-7 — может использоваться для собственных приложений в вашей инфраструктуре
+Формат сообщения syslog, приходящего на демон, следующий:
+
+Время события
+Источник события (к примеру, имя хоста или его IP-адрес)
+Код субьекта
+Уровень важности
+Идентификатор сообщения (генерируется автоматически)
+Сообщение
+Кроме этого, в сообщении может содержаться информация о процессе, который его отправил, но она опциональна и может храниться в так называемом теге.
+
+Изначально syslogd был единственным демоном, который реализовал принятие данных по протоколу syslog, однако со временем его заменили другие решения — syslog-ng, rsyslog и другие, в них уже решались проблемы, которые не вставали во времена первой редакции. Так, syslog изначально реализовывал передачу логов только по UDP, что могло приводить к потерям логов в ходе передачи, в то время как актуальные версии способны передавать данные как по TCP, так и в обвязке с TLS для шифрования этих данных.
+
+Современные реалии таковы, что ненасытный systemd, который имеется практически на каждом хосте, содержит в себе подсистему journald. Она реализует свой протокол передачи данных и хранит данные в бинарном структурированном виде вместо текстового, однако умеет принимать логи в формате syslog, перенаправлять их в том же формате далее. Правда, происходит это с определенными изменениями — логи вместо /var/log отправляются journald в /run/systemd/journal/syslog, и это требует установки дополнительного параметра в конфигурации journald (если, конечно, вы используете у себя в системе именно устаревший syslog, а не новые реализации демона). При этом стоит заметить, что journald использует те же уровни важности и субьекты, что и syslog, что позволяет не думать о разнице в решениях.
+
+Полезные ссылки:
+Syslog (wikipedia rus)
+SYSLOG протокол — серверы, сообщения и безопасность
+Syslog 101
+Linux logging guide: Understanding syslog, rsyslog, syslog-ng, journalctl
+Syslog vs Syslog-ng
+systemd/Journal (archlinux wiki)
+
