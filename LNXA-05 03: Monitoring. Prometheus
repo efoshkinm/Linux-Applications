@@ -1,0 +1,239 @@
+Задание:
+Произведите установку Prometheus Server на ваш удаленный сервер.
+Сконфигурируйте Prometheus Server так, чтобы он был доступен из интернета, производил сбор метрик раз в 20 секунд по умолчанию и собирал метрики с самого себя.
+Добавьте в конфигурационный файл Prometheus сбор метрик с Netdata из предыдущего задания раз в 10 секунд.
+На проверку отправьте конфигурационный файл Prometheus и ссылку для доступа к Prometheus Server Web UI.
+
+
+****************************************************************************
+Решение
+****************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+25.08.2022 11:13
+1. Произведите установку
+address: 84.252.140.72
+# Скачиваем
+wget https://github.com/prometheus/prometheus/releases/download/v2.38.0/prometheus-2.38.0.linux-amd64.tar.gz
+
+tar xvfz prometheus-*.tar.gz
+mv prometheus-2.38.0.linux-amd64 /opt
+cd prometheus-*
+
+# Создаем папки
+root@epdombki3acau4pu2nq8:/home/yc-user# mkdir /etc/prometheus
+root@epdombki3acau4pu2nq8:/home/yc-user# mkdir /var/lib/prometheus
+
+# Копируем в созданные папки
+root@epdombki3acau4pu2nq8:/opt/prometheus-2.38.0.linux-amd64# cp prometheus promtool /usr/local/bin
+root@epdombki3acau4pu2nq8:/opt/prometheus-2.38.0.linux-amd64# cp -r console_libraries consoles prometheus.yml /etc/prometheus/
+
+# Создаем пользователя и даем права ему
+useradd --no-create-home --shell /bin/false prometheus
+chown -R prometheus:prometheus /etc/prometheus /var/lib/prometheus
+chown prometheus:prometheus /usr/local/bin/{prometheus,promtool}
+
+# Запуск и проверка
+/usr/local/bin/prometheus --config.file /etc/prometheus/prometheus.yml --storage.tsdb.path /var/lib/prometheus/ --web.console.templates=/etc/prometheus/consoles --web.console.libraries=/etc/prometheus/console_libraries
+
+# Создаем юнит systemd
+vi /etc/systemd/system/prometheus.service
+[Unit]
+Description=Prometheus Service
+After=network.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+ExecStart=/usr/local/bin/prometheus \
+--config.file /etc/prometheus/prometheus.yml \
+--storage.tsdb.path /var/lib/prometheus/ \
+--web.console.templates=/etc/prometheus/consoles \
+--web.console.libraries=/etc/prometheus/console_libraries
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+systemctl daemon-reload
+systemctl enable prometheus
+chown -R prometheus:prometheus /var/lib/prometheus
+systemctl start prometheus
+systemctl status prometheus
+2. Установка netdata сервера и node-exporter на нем
+address: 158.160.5.225
+http://158.160.5.225:19999
+
+Проверка
+root@epdombki3acau4pu2nq8:/etc/prometheus# cat prometheus.yml 
+# my global config
+global:
+  scrape_interval: 20s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: "prometheus"
+    scrape_interval: 20s
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "netdata-scrape"
+    metrics_path: '/api/v1/allmetrics'
+    scrape_interval: 10s
+    params:
+      format: [prometheus]
+      #source: [as-collected]
+    honor_labels: true
+
+    static_configs:
+      - targets: ["158.160.5.225:19999"]
+
+http://84.252.140.72:9090/
+
+Очень интересно задание. 
+Спасибо! 
+Хотелось бы с нод экспортером повозиться, к сожалению не было в задании. 
+
+Брал systemd отсюда
+https://www.dmosk.ru/instruktions.php?object=prometheus-linux#systemd
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+25.08.2022 14:49
+Добрый день!
+
+"Очень интересно задание. Спасибо! Хотелось бы с нод экспортером повозиться, к сожалению не было в задании." - спасибо за обратную связь и оценку, направил автору задания.
+
+Отличные знание темы и выполнение задания, замечаний и вопросов нет!
+
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+
+
+Описание:
+Prometheus — это проект Cloud Native Computing Foundation (хотя исторически его разрабатывала SoundCloud). Является компонентной системой мониторинга для сбора метрик с указанным интервалом, обработки заранее заданных выражений правил. В ней релизованы механизмы реагирования на правила срабатываний в различные каналы уведомлений (через отдельную компоненту — Alertmanager) при соблюдении указанных условий срабатывания.
+
+Разберем архитектуру Prometheus со всеми компонентами:
+
+Архитектура Prometheus
+
+Основные компоненты:
+
+Prometheus — центральный сервер, который как раз занимается сбором метрик и обработкой правил срабатывания мониторинга.
+Service discovery — различные механизмы автоматического обнаружения хостов во внешних системах.
+Alertmanager — обрабатывает срабатывания от Prometheus и рассылает уведомления по сконфигурированным каналам.
+Client library/Exporter — либо встраиваемая в приложение библиотека, отвечающая за сбор метрик с самого приложения, либо отдельно стоящий сборщик метрик со сторонних приложений, который отдает метрики в формате Prometheus.
+Из этих небольших компонент (хотя компонент целей может быть много и совершенно различных) можно построить достаточно гибкую систему и потом расширить ее.
+
+Одной из главных особенностей работы Prometheus является Pull-механика сбора метрик. В отличие от Zabbix, в котором по умолчанию используется push-модель, Prometheus применяет механику discovery для обнаружения целей сбора метрик. Такой механикой может быть взаимодействие с kubernetes-api, DNS-записи, хотя также поддерживаются статично описанные адреса эндпоинтов с метриками в targets-конфигурации. Преимуществом модели является отсутствие «бутылочного горлышка» для трафика (большое количество сервисов, которые доставляют метрики по push-модели, не «заспамят» центральный сервер), а также возможность мониторить обьекты, которые не являются постоянно существующими (благодаря механике динамического обнаружения целей для сбора метрик) — яркий пример — это контейнеризированные приложения. Также важно помнить, что Prometheus извлекает метрики исключительно по http-запросам.
+
+Разумеется, Prometheus также умеет работать и по Push-модели, для этого используется технология Pushgateway. В этом случае Pushgateway выступает простым сервером, который при запросах сохраняет отправленные ему метрики и отдает их Prometheus по Pull-запросу. Строго говоря, такая модель встречается достаточно редко, это частные случаи для тех приложений, которые не предназначены для того, чтобы обрабатывать http-запросы (к примеру, фоновые задачи или бекапы, которые, однако, могут в результате своей работы обращаться к Pushgateway для сохранения результата). Но и тут есть варианты, например, для Node-exporter (один из возможных агентов Prometheus, который способен собирать метрики с хоста из разных источников) есть возможность организовать сбор метрик через файл. При этом ваше приложение будет записывать метрики в файл, с которого данные будут считываться Node-exporter и собираться Prometheus Server.
+
+Агент, которого мы упомянули выше (node_exporter), является примером готовых exporter-сервисов. Такие сервисы способны собирать телеметрию о работе приложений. Практически для каждого популярного open-source приложения, использующегося в той или иной роли в инфраструктуре, уже есть готовые экспортеры, что позволяет разворачивать production-ready инфраструктуру сбора метрик за небольшой промежуток времени и получать глубокую информацию о всей инфраструктуре.
+
+У каждой компоненты этого окружения может быть свой конфигурационный файл со своей нотацией. Так, конфигурационный файл Prometheus может выглядеть следующим образом:
+
+$ cat /etc/prometheus/prometheus.yml
+global:
+  scrape_interval:     15s # определяет, как часто по умолчанию производится сборка метрик
+rule_files: # определяет, какие файлы нужно считывать для составления списка правил срабатывания мониторинга или записи новых метрик (об этом ниже)
+  - 'prometheus.rules.yml'
+alerting: # определяет конфигурацию того, как обращаться к Alertmanager
+  alertmanagers:
+    - static_configs:
+      - 'localhost:9094'
+scrape_configs: # определяет массив групп целей для сборки метрик
+  - job_name: 'prometheus' # значение метки job, которая добавляется ко всем целям, попадающим под это правило
+    scrape_interval: 5s # перезаписывание частоты сбора метрик конкретно для этой группы целей
+    static_configs: # самый простой тип указания списка целей — массив хостов
+      - targets:
+        - 'localhost:9090'
+Давайте теперь рассмотрим, что возвращают экспортеры при запросах к эндпоинту Prometheus при сборе данных:
+
+$ curl http://localhost:9100/metrics
+# HELP go_gc_duration_seconds A summary of the GC invocation durations.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 3.8996e-05
+go_gc_duration_seconds{quantile="0.25"} 4.5926e-05
+go_gc_duration_seconds{quantile="0.5"} 5.846e-05
+...
+Разберем формат метрики построчно:
+
+# HELP metric_name ... — эта строка является вспомогательной, используется для объяснения человеку, что представляет собой метрика;
+# TYPE metric_name ... — это сервисная строка, которая описывает, какой тип данных хранится в метрике;
+metric_name{label_name="label_value"} metric_value — под этот шаблон попадает любая метрика (к примеру, go_gc_duration_seconds{quantile="0.25"} 4.5926e-05). Разберем поля:
+metric_name — имя метрики — именно так метрика будет храниться в Prometheus;
+label_name="label_value" — метка метрики — этот подход позволяет в одной метрике хранить разные связанные состояния метрики. У одной метрики, как правило, несколько метрик, которые используются для сужения необходимых данных при поиске;
+metric_value — значение метрики.
+Разберемся с метками чуть детальнее. К примеру, если бы у нас была метрика http_requests, которая разделяла бы метрики по портам и HTTP-статусу, то одна из них могла бы выглядеть как http_requests{port="9999",http_status="200"} 999. Зачем это нужно, мы разберем чуть дальше.
+
+Кроме функций сбора метрик, Prometheus сервер также имеет встроенный Web UI, который предоставляет ограниченный функционал по созданию запросов метрик, для просмотра списка правил срабатывания и их состояния, а также проверки списка целей мониторинга. Доступен он на том порту, который указывается при запуске (по умолчанию — 9090). Выглядит он следующим образом:
+
+Prometheus Web UI
+
+Основные разделы по заголовку:
+
+Alerts — переведет вас к списку правил мониторинга;
+Status -> Targets — выведет список целей для сбора метрик;
+Status -> Rules — выведет список всех правил мониторинга.
+Теперь разберемся со «слоном в комнате» — огромным полем для ввода Expression на главной странице. Оно используется для ввода запросов на языке PromQL, на базе которых выводятся метрики. В зависимости от сложности запроса, мы можем как запросить просто метрики, так и ограничить их условиями или применить к ним функции (к примеру, для подсчета изменений метрики при ее постоянном росте). К примеру, вот запросы для описанной выше метрики http_requests:
+
+http_requests — выведет все метрики со всеми метками и всеми значениями метрик;
+http_requests{http_status!="200"} — выведет все метрики, у которых метка http_status не равняется 200 (к примеру, 502, 300);
+rate(http_requests{http_status!="200"}[1m]) — позволяет при помощи функции rate вывести изменения предыдущей метрики, а не просто выводить постоянный рост метрики;
+rate(http_requests{http_status!="200"}[1m]) > 10 — позволяет ограничить вывод до тех метрик, которые подходят по условию (в нашем случае — у которых за минуту было изменение больше 10).
+Последняя метрика представляет собой хороший пример правила срабатывания, которое можно описать для мониторинга. Такие правила описываются в файлах, указанных в директиве rule_files в prometheus.yml (пример выше). Формат файла следующий:
+
+groups: # каждый файл должен содержать этот массив
+- name: general # у каждой группы должно быть указано имя
+  rules:
+    # эта запись представляет собой правило для записи новых метрик на базе имеющихся в автоматическом режиме, что бывает полезно, если для получения этой выборки у вас сложное выражение, запомнить которое сложно, а используется часто
+  - record: job_instance_mode:node_cpu_seconds:avg_rate5m
+    expr: avg by (job, instance, mode) (rate(node_cpu_seconds_total[5m]))
+  # эта запись является правилом срабатывания мониторинга — когда значение возвращает какие-то данные, то считается, что условие сработало, а значит мониторинг «выстрелил»
+  - alert: CPULongIOWait
+    expr: job_instance_mode:node_cpu_seconds:avg_rate5m{job="myjob",mode="iowait"} > 0.5
+    for: 10m # позволяет указать, через сколько минут актуальности метрики нужно отправлять уведомление
+    labels: # метки, применяемые к алерту (используется в Alertmanager)
+      severity: page
+    annotations: # служебная информация, которую можно использовать при выводе события через Alertmanager
+      summary: High request latency
+Как было сказано ранее, за отправку уведомлений в Prometheus стеке отвечает компонента, именуемая Alertmanager. Она получает запросы от Prometheus по всем событиям и их восстановлению, а Alertmanager уже в зависимости от своего конфигурационного файла отправляет запросы по сконфигурированным каналам (от простого выбрасывания события до отправки в систему автоматического обзвона типа PagerDuty).
+
+В рамках этого задания мы сконфигурируем Prometheus Server в простом режиме, где будем только собирать метрики. Для целей сборки же мы будем использовать один из сервисов, который мы с вами уже разобрали и который умеет отдавать метрики в формате Prometheus, — Netdata.
+
+Полезные ссылки:
+Prometheus docs
+Getting started
+Metric types
+Introduction to PromQL, the Prometheus Query Language
+Alerting rules
+Полное руководство по Prometheus в 2019 году (habr)
+Step by step guide to setting up Prometheus, Alertmanager with Slack, PagerDuty and Gmail
+Netdata exporters
