@@ -1,0 +1,383 @@
+Задание:
+Установите утилиты для работы с Samba-сервером на вашем удаленном сервере.
+Приведите адрес вашего удаленного сервера (можно получить, сделав запрос curl ifconfig.io) (команды и вывод сохраните).
+Настройте Samba-сервер, который позволяет примонтировать директорию /rebrainme, и вызовите testparm для вывода конфига.
+Настройте вашу локальную виртуальную машину для автоматического монтирования директории /rebrainme на удаленном сервере в локальную директорию /mnt/ и примонтируйте ее (команды и вывод сохраните).
+На вашей локальной машине в примонтированной директории создайте файл linux и выведите список всех файлов с их владельцами (команды и вывод сохраните).
+На вашем сервере в экспортируемой директории выведите список всех файлов и их владельцев (команды и вывод сохраните).
+Отправьте на проверку все полученные выводы и конфигурационные файлы Samba-сервера и файла монтирования на вашей локальной виртуальной машине.
+
+
+
+****************************************************************************
+Решение
+****************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+26.11.2022 23:20
+1. Установите утилиты для работы с Samba-сервером на вашем удаленном сервере.
+address: 51.250.104.152
+
+apt update
+apt install samba samba-client
+
+2. Приведите адрес вашего удаленного сервера (можно получить, сделав запрос curl ifconfig.io) (команды и вывод сохраните).
+curl ifconfig.io
+51.250.104.152
+
+3. Настройте Samba-сервер, который позволяет примонтировать директорию /rebrainme, и вызовите testparm для вывода конфига.
+cd /etc/samba
+cd smb.conf smb.conf.bak
+mkdir rebrainme
+
+Создаем группу которой разрешен доступ к самба
+groupadd samba_group
+
+Создаем пользователя
+useradd max
+usermod -aG samba_group max
+chgrp samba_group /rebrainme
+
+passwd max
+max
+
+smbpasswd -a max
+samba_max
+
+vi smb.conf
+[rebrainme]
+   path = /rebrainme
+   valid users = @samba_group
+   guest ok = yes
+   browsable = yes
+   writable = yes
+
+root@epdg0po2ra66fo9ot6p4:/etc/samba# testparam
+
+Command 'testparam' not found, did you mean:
+
+  command 'testparm' from deb samba-common-bin (2:4.13.17~dfsg-0ubuntu1.20.04.1)
+
+Try: apt install <deb name>
+
+root@epdg0po2ra66fo9ot6p4:/etc/samba# testparm
+Load smb config files from /etc/samba/smb.conf
+Loaded services file OK.
+Weak crypto is allowed
+WARNING: The 'netbios name' is too long (max. 15 chars).
+
+Server role: ROLE_STANDALONE
+
+Press enter to see a dump of your service definitions
+
+# Global parameters
+[global]
+	idmap config * : backend = tdb
+
+
+[rebrainme]
+	create mask = 0644
+	force user = max
+	path = /rebrainme
+	read only = No
+
+
+systemctl restart smbd
+
+
+4. Настройте вашу локальную виртуальную машину для автоматического монтирования директории /rebrainme на удаленном сервере в локальную директорию /mnt/ и примонтируйте ее (команды и вывод сохраните).
+apt update
+apt install smbclient
+
+В общем я столкнулся с проблемой что Samba через интернет не работает)) ну наверное оно и правильно )) Так же провайдеры блочат самбовские порты скорее всего. 
+В общем я допер что мне нужно поднять VPN для выполнения задачи. Скажу сразу я не сразу до этого допер. 
+Но, я выбрал наиболее понравившийся мне из предыдущего задания Tinc VPN. Он легковесный, на втором месте WG.
+
+Что ж, я освежил в памяти про Tinc, скажу честно я оказывается многое подзабыл. 
+Samba-server:
+root@epdg0po2ra66fo9ot6p4:/etc/tinc/samba# ll
+total 32
+drwxr-xr-x 3 root root 4096 Nov 26 05:32 ./
+drwxr-xr-x 3 root root 4096 Nov 25 05:07 ../
+drwxr-xr-x 2 root root 4096 Nov 26 05:30 hosts/
+-rw------- 1 root root 3244 Nov 25 05:11 rsa_key.priv
+-rw------- 1 root root  776 Nov 25 05:11 rsa_key.pub
+-rw-r--r-- 1 root root   63 Nov 25 19:02 tinc.conf
+-rwxr-xr-x 1 root root   70 Nov 26 05:32 tinc-down*
+-rwxr-xr-x 1 root root   68 Nov 26 05:32 tinc-up*
+
+root@epdg0po2ra66fo9ot6p4:/etc/tinc/samba# cat tinc-up
+ip link set $INTERFACE up
+ip addr add 192.168.3.1/24 dev $INTERFACE
+root@epdg0po2ra66fo9ot6p4:/etc/tinc/samba# cat tinc.conf
+Name = samba_server
+AddressFamily = ipv4
+Device = /dev/net/tun
+root@epdg0po2ra66fo9ot6p4:/etc/tinc/samba# cat hosts/samba_client 
+Address = 213.24.126.173
+Subnet = 192.168.3.2
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAu2LjiJoPiqF6sH0B+LEnPn5LQNTTRps9JnUAjn5KkahoA2shsPd+
+KNjCzCPYpWI5Ndofk+5Yyo+Sg3TONQPr8Edt78oi0pb8xXM4FCgJdd0fiHRJYb0h
+YW2S7/SBoVZSWuYcMn9brOPm4phEDELqyCtTqe/ygR+D+YVL1xZqZZHMzSuAmm2S
+zzNVv6vYhQg/UGo0pW9CAIVC6qdtAp1CQ6bF9fmKZf7vCvIZKdl15rQUkQPM+kll
+i6I6RkDUbCEo/2OdT6tSoe01pHepQx6lu7OfB4ZB90sV3ZIIMN15x3pZ/6JmG99Y
+bSUZubgdPbMWEyo1qVuDu1vs2TPlPU+/97fn94V/iDl/9ESXOUrGamAsA4Frm3s5
+uWbjtEdkNf8bQoobwA0LlY8k2CqKh0Fm/Yfw6iseTqsrGdTfbnJnmBR0KQb0G/RB
+xgFl867Ug4FVXZWu+7+V/6+rpPcHz2Q7goPnnRGzKVooB9n71B20YB/wm2RgdSAe
+0lzrkdnitj8XhiqnS28QUfCcpTuzr/5Nkvnh24Xn12Jub8fOSDDjMVCocK/ua5/T
+hETL8JU9oAri+p6dY4aqZJ10T3dGHZQmM6KPNFLqcQ/YFea2zdUwZHuowpliZi73
+agu3PKdx75FOUN15QE09vS6dOzwhonEUvVBvN9aP2b9Wq9VbOGKx0ZkCAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+root@epdg0po2ra66fo9ot6p4:/etc/tinc/samba# cat hosts/samba_server 
+Address = 51.250.104.152
+Subnet = 192.168.3.1
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAx8UJyS/HMrXTaKnBDOyTdsuuJ+vRwfdVrWsafSSiBfiU8X5eZhEp
+4jxiYfjjHi5Vt3IcTH7Wfb3aJq1MHAERn8uihTS6zIC9fxrIYGG7n2FLeCfmEfKH
+Cc+zjmVraF07ifPUp5nzwGAQcO43GWNz7QuZ+NLmZGNS7CRX39TgIBCBwNLEMKSS
+xWOdrIy8vQoir5Rf2+5o71tuGKxDsFWNcvj/1dtCaypva/ZmNFoxVqJG6QhuWJlv
+9JM6tfSG4Btq3ffHfo1GKtMBR3ziAxjz/jNPm+SL43FrwUF99yJ4VCwrtvkl+Lca
+R/VvPh/c9bUA+aJVYu1b3pgb//oYRbQT6orwtYjb4mQLILzntZ/KCoYLm10217TU
+717jXWWLF4xOWO72xr8mplb/pcg5mzWHjkZszTMlbQp1GEqTZOVebnUIYp6d72Ds
+iIHq5ROekcGvyRDgM+R1dtyRNp1aKb3oZmbhP06MguuE4lZ4eq3McGO+BRLh8SAP
+5IXZmDOk6rMr6QvEtEuweXj/QQFS04Bt+sV83hXCifabz7BAADthB1RYipRTEEnL
+8S8QHlh1cXD5+lh/Qe2YPApwkVbV3DPZ2JXRGWgNx/ElHz5N/eHavEZ3wd2cvptO
+SgwKacyRCzj6/WNZxAD7JVQ0iwxlJLn06ytfydWRsZBWH3/fglqsx2UCAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+root@epdg0po2ra66fo9ot6p4:/etc/tinc/samba# ip -br ad
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+eth0             UP             10.129.0.25/24 fe80::d20d:10ff:fe06:702d/64 
+samba            UNKNOWN        192.168.3.1/24 fe80::b955:2aa4:2a5a:bd97/64 
+
+
+Samba-Client
+В целом тоже самое только наоборот.
+root@ubuntu-server:/etc/tinc/samba# ll
+total 32
+drwxr-xr-x 3 root root 4096 Nov 26 05:32 ./
+drwxr-xr-x 3 root root 4096 Nov 25 05:16 ../
+drwxr-xr-x 2 root root 4096 Nov 26 05:29 hosts/
+-rw------- 1 root root 3248 Nov 25 05:24 rsa_key.priv
+-rw------- 1 root root  776 Nov 25 05:24 rsa_key.pub
+-rw-r--r-- 1 root root   88 Nov 25 19:22 tinc.conf
+-rwxr-xr-x 1 root root   70 Nov 26 05:32 tinc-down*
+-rwxr-xr-x 1 root root   69 Nov 26 05:32 tinc-up*
+root@ubuntu-server:/etc/tinc/samba# cat tinc.conf 
+Name = samba_client
+ConnectTo = samba_server
+Device = /dev/net/tun
+AddressFamily = ipv4
+root@ubuntu-server:/etc/tinc/samba# cat tinc-up 
+ip link set $INTERFACE up
+ip addr add 192.168.3.2/24 dev $INTERFACE
+
+root@ubuntu-server:/etc/tinc/samba# cat hosts/samba_server 
+Address = 51.250.104.152
+Subnet = 192.168.3.1
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAx8UJyS/HMrXTaKnBDOyTdsuuJ+vRwfdVrWsafSSiBfiU8X5eZhEp
+4jxiYfjjHi5Vt3IcTH7Wfb3aJq1MHAERn8uihTS6zIC9fxrIYGG7n2FLeCfmEfKH
+Cc+zjmVraF07ifPUp5nzwGAQcO43GWNz7QuZ+NLmZGNS7CRX39TgIBCBwNLEMKSS
+xWOdrIy8vQoir5Rf2+5o71tuGKxDsFWNcvj/1dtCaypva/ZmNFoxVqJG6QhuWJlv
+9JM6tfSG4Btq3ffHfo1GKtMBR3ziAxjz/jNPm+SL43FrwUF99yJ4VCwrtvkl+Lca
+R/VvPh/c9bUA+aJVYu1b3pgb//oYRbQT6orwtYjb4mQLILzntZ/KCoYLm10217TU
+717jXWWLF4xOWO72xr8mplb/pcg5mzWHjkZszTMlbQp1GEqTZOVebnUIYp6d72Ds
+iIHq5ROekcGvyRDgM+R1dtyRNp1aKb3oZmbhP06MguuE4lZ4eq3McGO+BRLh8SAP
+5IXZmDOk6rMr6QvEtEuweXj/QQFS04Bt+sV83hXCifabz7BAADthB1RYipRTEEnL
+8S8QHlh1cXD5+lh/Qe2YPApwkVbV3DPZ2JXRGWgNx/ElHz5N/eHavEZ3wd2cvptO
+SgwKacyRCzj6/WNZxAD7JVQ0iwxlJLn06ytfydWRsZBWH3/fglqsx2UCAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+root@ubuntu-server:/etc/tinc/samba# cat hosts/samba_client 
+Address = 213.24.127.189
+Subnet 192.168.3.2
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAu2LjiJoPiqF6sH0B+LEnPn5LQNTTRps9JnUAjn5KkahoA2shsPd+
+KNjCzCPYpWI5Ndofk+5Yyo+Sg3TONQPr8Edt78oi0pb8xXM4FCgJdd0fiHRJYb0h
+YW2S7/SBoVZSWuYcMn9brOPm4phEDELqyCtTqe/ygR+D+YVL1xZqZZHMzSuAmm2S
+zzNVv6vYhQg/UGo0pW9CAIVC6qdtAp1CQ6bF9fmKZf7vCvIZKdl15rQUkQPM+kll
+i6I6RkDUbCEo/2OdT6tSoe01pHepQx6lu7OfB4ZB90sV3ZIIMN15x3pZ/6JmG99Y
+bSUZubgdPbMWEyo1qVuDu1vs2TPlPU+/97fn94V/iDl/9ESXOUrGamAsA4Frm3s5
+uWbjtEdkNf8bQoobwA0LlY8k2CqKh0Fm/Yfw6iseTqsrGdTfbnJnmBR0KQb0G/RB
+xgFl867Ug4FVXZWu+7+V/6+rpPcHz2Q7goPnnRGzKVooB9n71B20YB/wm2RgdSAe
+0lzrkdnitj8XhiqnS28QUfCcpTuzr/5Nkvnh24Xn12Jub8fOSDDjMVCocK/ua5/T
+hETL8JU9oAri+p6dY4aqZJ10T3dGHZQmM6KPNFLqcQ/YFea2zdUwZHuowpliZi73
+agu3PKdx75FOUN15QE09vS6dOzwhonEUvVBvN9aP2b9Wq9VbOGKx0ZkCAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+root@ubuntu-server:/etc/tinc/samba# ip -br ad
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+enp0s3           UP             192.168.0.16/24 fe80::a00:27ff:fe43:9487/64 
+enp0s8           DOWN           
+lxcbr0           DOWN           10.0.3.1/24 
+samba            UNKNOWN        192.168.3.2/24 fe80::7f60:41c2:88e9:42cb/64 
+
+
+Как результат:
+
+root@ubuntu-server:/etc/tinc/samba# smbclient -U max -L //192.168.3.1
+Enter WORKGROUP\max's password: 
+
+	Sharename       Type      Comment
+	---------       ----      -------
+	rebrainme       Disk      
+	IPC$            IPC       IPC Service (Samba 4.13.17-Ubuntu)
+SMB1 disabled -- no workgroup available
+root@ubuntu-server:/etc/tinc/samba# 
+
+Потомучто если сделать подключение на прямую, что не безопасно и не правильно в целом, получится вот это:
+root@ubuntu-server:/etc/tinc/samba# smbclient -U max -L //51.250.104.152
+do_connect: Connection to 51.250.104.152 failed (Error NT_STATUS_IO_TIMEOUT)
+
+
+Поэтому идем дальше и делаем automount через systemd unit.
+
+root@ubuntu-server:/etc/systemd/system# cat mnt.mount 
+[Unit]
+Description=Samba rebrainme mount unit
+[Mount]
+What=//192.168.3.1/rebrainme
+Where=/mnt
+Type=cifs
+Options=rw,user=max,password=samba_max
+DirectoryMode=0755
+
+root@ubuntu-server:/etc/systemd/system# cat mnt.automount 
+[Unit]
+Description=Samba automount unit
+Requires=network-online.target
+[Automount]
+Where=/mnt
+TimeoutIdleSec=100
+[Install]
+WantedBy=multi-user.target
+root@ubuntu-server:/etc/sys
+
+systemctl enable --now samba.automount
+5. На вашей локальной машине в примонтированной директории создайте файл linux и выведите список всех файлов с их владельцами (команды и вывод сохраните).
+ root@ubuntu-server:/etc/systemd/system# cd /mnt
+root@ubuntu-server:/mnt# touch file
+root@ubuntu-server:/mnt# ll
+total 4
+drwxr-xr-x  2 root root    0 Nov 26 20:13 ./
+drwxr-xr-x 19 root root 4096 Nov 12 19:52 ../
+-rwxr-xr-x  1 root root    0 Nov 26 20:13 file*
+ 
+ 
+6. На вашем сервере в экспортируемой директории выведите список всех файлов и их владельцев (команды и вывод сохраните).
+root@epdg0po2ra66fo9ot6p4:/home/yc-user# cd /rebrainme/
+root@epdg0po2ra66fo9ot6p4:/rebrainme# ll
+total 8
+drwxrwxrwx  2 max  samba_group 4096 Nov 26 20:13 ./
+drwxr-xr-x 19 root root        4096 Nov 25 02:02 ../
+-rw-r--r--  1 max  max            0 Nov 26 20:13 file
+
+ 
+ 
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+27.11.2022 22:18
+Добрый день!
+
+Отличные знание темы и выполнение задания, хорошо что так обстоятельно все разбираете, замечаний и вопросов нет!
+
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+
+LNXA-09 03: Storage. Samba
+Описание:
+Сперва немного истории. В начале 1980-х годов IBM разработала интерфейс NetBIOS - Network Basic Input/Output System (сетевая базовая система ввода/вывода), который позволял компьютерам в одной локальной сети общаться друг с другом. Далее была выпущена расширенная версия этого протокола NetBEUI - NetBIOS Extended User Interface (расширенный пользовательский интерфейс NetBIOS), который стал достаточно популярным и работал поверх различных сетевых протоколов, например, IPX, DECNet, TCP/IP. На базе этого протокола Microsoft и Intel разработали протокол SMB - Server Message Block (блок сообщений сервера), который позволял предоставить доступ к файлам, принтерам и другим ресурсам компьютера в сети. В конце концов протокол SMB превратился в систему CIFS (Common Internet File System), которая могла работать в глобальных сетях. Наконец в 1992 году появился пакет Samba - серверная часть CIFS для UNIX и Linux.
+
+Основные службы Samba:
+
+совместное использование файлов;
+совместный доступ к принтерам и буферизация задач на печать;
+авторизация и аутентификация;
+разрешение имен;
+объявление служб;
+регистрация доменов Windows.
+Большая часть функциональности пакета samba реализуется двумя демонами: smbd и nmbd. Первый реализует обслуживание файлов, заданий на печать и выполняет авторизацию и аутентификацию. Второй обслуживает разрешение имен и объявление служб.
+
+По аналогии с NFS создадим общую папку /var/samba/rebrainme-server. Для этого в конфиг /etc/samba/smb.conf добавим следующие строки:
+
+[rebrainme]
+comment = REBRAIN!
+path = /var/samba/rebrainme-server #общая директория
+guest ok = yes # разрешить доступ без логина и пароля
+writable = yes # разрешить запись
+create mask = 0644
+directory mask = 0755
+force user = rebrainme # имя подключившегося пользователя
+Добавим пользователя и создадим директорию:
+
+# adduser --system rebrainme
+# mkdir -p /var/samba/rebrainme-server
+# chown -R rebrainme /var/samba/rebrainme-server
+С помощью команды testparm можно посмотреть текущую конфигурацию. Должны присутствовать следующие строки:
+
+# testparm
+...
+[rebrainme]
+        comment = REBRAIN
+        path = /var/samba/rebrainme-server
+        force user = rebrainme
+        read only = No
+        create mask = 0644
+        guest ok = Yes
+...
+С помощью команды smbclient можно посмотреть информацию о сервере, а также подключиться к нему и выполнить стандартные команды для работы с файловой системой:
+
+# smbclient -L //hostname
+WARNING: The "syslog" option is deprecated
+Enter root's password: 
+Domain=[WORKGROUP] OS=[Windows 6.1] Server=[Samba 4.3.11-Ubuntu]
+
+	Sharename       Type      Comment
+	---------       ----      -------
+	print$          Disk      Printer Drivers
+	rebrainme       Disk      REBRAIN
+	IPC$            IPC       IPC Service (hostname server (Samba, Ubuntu))
+
+# smbclient  //hostname/rebrainme
+WARNING: The "syslog" option is deprecated
+Enter root's password:
+Domain=[WORKGROUP] OS=[Windows 6.1] Server=[Samba 4.3.11-Ubuntu]
+smb: \> ls
+  .                                   D        0  Sun Nov  8 19:12:24 2020
+  ..                                  D        0  Sun Nov  8 19:12:24 2020
+
+		38285808 blocks of size 1024. 20565812 blocks available
+smb: \> mkdir samba_rebrainme
+smb: \> cd samba_rebrainme\
+smb: \samba_rebrainme\> put rebrain_file
+putting file rebrain_file as \samba_rebrainme\rebrain_file (0.1 kb/s) (average 0.1 kb/s)
+smb: \samba_rebrainme\> ls
+  .                                   D        0  Sun Nov  8 19:19:16 2020
+  ..                                  D        0  Sun Nov  8 19:18:27 2020
+  rebrain_file                        N        2  Sun Nov  8 19:19:16 2020
+
+		38285808 blocks of size 1024. 20564804 blocks available
+С помощью команды help можно получить список всех доступных команд smb. Если присмотреться к нему, можно увидеть, что он очень сильно напоминает команды ftp. Помимо доступа к общей директории через smbclient можно выполнить монтирование с помощью команды mount.cifs:
+
+# mount.cifs //hostname/rebrainme /mnt -o guest
+# df -h /mnt
+Filesystem                                  Size  Used Avail Use% Mounted on
+//hostname/rebrainme   37G   16G   20G  44% /mnt
+# ls /mnt/samba_rebrainme/
+rebrain_file
+В отличие от NFS Samba не требует модификации ядра, а запускает отдельный пользовательский процесс. При поступлении запроса от пользователя демон smbd создает форк самого себя и работает от имени пользователя, сделавшего запрос.
+
+Мы рассмотрели только малую часть возможностей Samba, больше информации можно найти на официальном сайте
+
+Полезные ссылки:
+samba.org
+Все о Samba
+Настройка файлового сервера в локальной сети на Windows/Linux
