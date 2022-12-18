@@ -1,0 +1,459 @@
+Задание:
+Установите пакет php-fpm (сохраните команду для установки).
+Напишите конфигурационный файл для PHP-FPM pool, который устанавливает следующие параметры:
+имя pool - rebrainme;
+пользователь и группа, от имени которых запущен pool, - www-data;
+pool должен слушать на Unix-сокете;
+использовал фиксированно 10 процессов для обработки запросов.
+Напишите конфигурационный файл для nginx, который реализует следующую функциональность:
+слушает на порте 8081;
+проксирует все запросы на описанный PHP-FPM pool;
+в роли index использовать файл с phpinfo из https://www.php.net/manual/ru/function.phpinfo.php из директории /var/www/phpinfo.
+В ответ пришлите:
+Конфигурационный файл nginx и путь до него
+Конфигурационный файл PHP-FPM pool и путь до него
+адрес, по которому можно проверить работу вашей конфигурации через браузер
+
+**********************************************************************************
+Решение
+**********************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+18.06.2022 15:31
+[m.efoshkin@fedora ~]$ yc compute instance create     --name efoshkin-lnxa-01-05     --network-interface subnet-name=default-ru-central1-b,nat-ip-version=ipv4     --zone ru-central1-b     --ssh-key ~/.ssh/id_rsa.pub     --cores 2     --core-fraction 5     --preemptible     --create-boot-disk image-folder-id=standard-images,image-family=ubuntu-2004-lts     --labels user_email=maxefoshkin@gmail.com,task_name=lnxa-01-05
+done (19s)
+id: epdu4ht839atefsipa9l
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-06-18T07:32:36Z"
+name: efoshkin-lnxa-01-05
+labels:
+  task_name: lnxa-01-05
+  user_email: maxefoshkin@gmail.com
+zone_id: ru-central1-b
+platform_id: standard-v2
+resources:
+  memory: "2147483648"
+  cores: "2"
+  core_fraction: "5"
+status: RUNNING
+boot_disk:
+  mode: READ_WRITE
+  device_name: epdrvuaslt6gevdg8dsm
+  auto_delete: true
+  disk_id: epdrvuaslt6gevdg8dsm
+network_interfaces:
+- index: "0"
+  mac_address: d0:0d:1e:24:7a:81
+  subnet_id: e2lebfr9cjkjg4ruk3gn
+  primary_v4_address:
+    address: 10.129.0.25
+    one_to_one_nat:
+      address: 84.201.178.107
+      ip_version: IPV4
+fqdn: epdu4ht839atefsipa9l.auto.internal
+scheduling_policy:
+  preemptible: true
+network_settings:
+  type: STANDARD
+placement_policy: {}
+
+
+Установка
+
+$ apt install nginx-full
+root@epdu4ht839atefsipa9l:/etc/nginx/sites-enabled# apt-get update
+root@epdu4ht839atefsipa9l:/etc/nginx/sites-enabled# apt install php-fpm
+
+
+Настройка
+
+root@epdu4ht839atefsipa9l:/etc/nginx/sites-enabled# cat nip 
+server {
+  listen 8081 default;
+
+  server_name 84.201.178.107.nip.io;
+
+  root /var/www/phpinfo/;
+
+  index index.php;
+
+  location ~* \.(jpg|jpeg|gif|png|css|js|ico|xml|html)$ {
+    try_files         $uri $uri/ /index.php?$query_string;
+    access_log        off;
+    log_not_found     off;
+    expires           1d;
+  }
+
+  location / {
+    client_max_body_size 8m;
+    client_body_buffer_size 128k;
+    try_files $uri $uri/ /index.php?$query_string;
+  }
+
+  location ~ \.php$ {
+    fastcgi_split_path_info ^(.+\.php)(/.+)$;
+    fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;
+    fastcgi_index index.php;
+    include fastcgi_params; # может содержать директивы передачи параметров по протоколу FastCGI
+  }
+
+
+
+  location ~ /\.ht {
+                deny all;
+        }
+}
+
+
+
+
+
+
+
+root@epdu4ht839atefsipa9l:/etc/php/7.4/fpm/pool.d# cat rebrainme.conf  | grep -v ";"
+[rebrainme]
+
+
+user = www-data
+group = www-data
+
+listen = /var/run/php/php7.4-fpm.sock
+
+
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0660
+
+
+
+
+pm = static
+
+pm.max_children = 10
+
+pm.start_servers = 2
+
+pm.min_spare_servers = 1
+
+pm.max_spare_servers = 3
+
+
+
+
+
+Проверка
+http://84.201.178.107.nip.io:8081/
+
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+НА ДОРАБОТКЕ 3
+19.06.2022 10:45
+Здравствуйте! Проверить задание не могу, сервер не доступен. На случай если вм вдруг окажется остановленой, попробуйте при создании ВМ не использовать опцию preemptible.
+
+21.06.2022 09:35
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+21.06.2022 09:35
+[m.efoshkin@MiWiFi-R4A-srv ~]$ yc compute instance start efoshkin-lnxa-01-05
+done (17s)
+id: epdu4ht839atefsipa9l
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-06-18T07:32:36Z"
+name: efoshkin-lnxa-01-05
+labels:
+  task_name: lnxa-01-05
+  user_email: maxefoshkin@gmail.com
+zone_id: ru-central1-b
+platform_id: standard-v2
+resources:
+  memory: "2147483648"
+  cores: "2"
+  core_fraction: "5"
+status: RUNNING
+boot_disk:
+  mode: READ_WRITE
+  device_name: epdrvuaslt6gevdg8dsm
+  auto_delete: true
+  disk_id: epdrvuaslt6gevdg8dsm
+network_interfaces:
+- index: "0"
+  mac_address: d0:0d:1e:24:7a:81
+  subnet_id: e2lebfr9cjkjg4ruk3gn
+  primary_v4_address:
+    address: 10.129.0.25
+    one_to_one_nat:
+      address: 178.154.195.74
+      ip_version: IPV4
+fqdn: epdu4ht839atefsipa9l.auto.internal
+scheduling_policy:
+  preemptible: true
+network_settings:
+  type: STANDARD
+placement_policy: {}
+
+
+root@epdu4ht839atefsipa9l:/etc/nginx/sites-enabled# cat nip 
+server {
+  listen 8081 default;
+
+  server_name 178.154.195.74.nip.io;
+
+  root /var/www/phpinfo;
+
+  index index.php;
+
+  location ~* \.(jpg|jpeg|gif|png|css|js|ico|xml|html)$ {
+    try_files         $uri $uri/ /index.php?$query_string;
+    access_log        off;
+    log_not_found     off;
+    expires           1d;
+  }
+
+  location / {
+    client_max_body_size 8m;
+    client_body_buffer_size 128k;
+    try_files $uri $uri/ /index.php?$query_string;
+  }
+
+  location ~ \.php$ {
+    fastcgi_split_path_info ^(.+\.php)(/.+)$;
+    fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+    fastcgi_index index.php;
+    include fastcgi_params; 
+    fastcgi_param SCRIPT_FILENAME /var/www/phpinfo/$fastcgi_script_name; # может содержать директивы передачи параметров по протоколу FastCGI
+  }
+
+
+
+  location ~ /\.ht {
+                deny all;
+        }
+}
+root@epdu4ht839atefsipa9l:/etc/nginx/sites-enabled# 
+
+
+
+root@epdu4ht839atefsipa9l:/etc/php/7.4/fpm/pool.d# cat rebrainme.conf | grep -v ";"
+[rebrainme]
+
+user = www-data
+group = www-data
+
+listen =/var/run/php/php7.4-fpm.sock
+
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0660
+
+pm = static
+pm.max_children = 10
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+
+
+root@epdu4ht839atefsipa9l:/etc/php/7.4/fpm/pool.d# systemctl status php7.4-fpm
+● php7.4-fpm.service - The PHP 7.4 FastCGI Process Manager
+     Loaded: loaded (/lib/systemd/system/php7.4-fpm.service; enabled; vendor preset: enabled)
+     Active: active (running) since Tue 2022-06-21 06:27:28 UTC; 7min ago
+       Docs: man:php-fpm7.4(8)
+    Process: 1055 ExecStartPost=/usr/lib/php/php-fpm-socket-helper install /run/php/php-fpm.sock /etc/php/7.4/fpm/pool.d/www.conf 74 (code=exited, status=0/SUCCESS)
+   Main PID: 1035 (php-fpm7.4)
+     Status: "Processes active: 0, idle: 10, Requests: 2, slow: 0, Traffic: 0req/sec"
+      Tasks: 11 (limit: 2310)
+     Memory: 11.1M
+     CGroup: /system.slice/php7.4-fpm.service
+             ├─1035 php-fpm: master process (/etc/php/7.4/fpm/php-fpm.conf)
+             ├─1045 php-fpm: pool rebrainme
+             ├─1046 php-fpm: pool rebrainme
+             ├─1047 php-fpm: pool rebrainme
+             ├─1048 php-fpm: pool rebrainme
+             ├─1049 php-fpm: pool rebrainme
+             ├─1050 php-fpm: pool rebrainme
+             ├─1051 php-fpm: pool rebrainme
+             ├─1052 php-fpm: pool rebrainme
+             ├─1053 php-fpm: pool rebrainme
+             └─1054 php-fpm: pool rebrainme
+
+Jun 21 06:27:28 epdu4ht839atefsipa9l systemd[1]: Starting The PHP 7.4 FastCGI Process Manager...
+Jun 21 06:27:28 epdu4ht839atefsipa9l systemd[1]: Started The PHP 7.4 FastCGI Process Manager.
+root@epdu4ht839atefsipa9l:/etc/php/7.4/fpm/pool.d# 
+
+
+
+
+
+
+
+
+
+Проверка 178.154.195.74.nip.io:8081
+все работает
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 5
+21.06.2022 10:40
+Максим, здравствуйте! Задание выполнено, замечаний нет.
+
+
+**************************************************************************
+Теория
+**************************************************************************
+
+LNXA-01 05: Web. PHP-FPM
+Описание:
+В предыдущем задании мы упомянали связку nginx + PHP-FPM для работы приложений на PHP, но не вдавались в вопросы, как эта связка работает, остановившись лишь на mod_php. В этом же задании мы разберем, что собой представляет PHP-FPM и как им пользоваться, поскольку эта связка зарекомендовала себя как стабильное и производительное решение для работы с PHP-приложениями.
+
+Начнем разбор с самого названия решения - PHP-FPM. Если с PHP все понятно, то с FPM интереснее. Данная аббревиатура расшифровывается как FastCGI Process Manager, то есть данное решение - это простой менеджер процессов для обработки запросов к приложению PHP, которое умеет просто принимать запросы по протоколу FastCGI и запускать обработчик кода на PHP с учетом установленной конфигурации, не более. За счет того, что данная компонента только и делает, что обрабатывает динамические запросы, работает она очень стабильно и быстро.
+
+PHP-FPM принято использовать в связке с nginx именно из-за того, что первый быстро и эффективно справляется с обработкой динамических запросов, а второй - со статикой. Более того, PHP-FPM не умеет работать со статикой от слова совсем - его задача состоит в том, чтобы передать запрос на обработку и получить ответ на него, а не запрашивать вместе с ним все остальное (к примеру, изображения или JavaScript/CSS-файлы).
+
+Для работы с протоколом FastCGI в nginx есть модуль ngx_http_fastcgi_module, который расчитан на проксирование запросов по этому протоколу. Директива proxy_pass, которую мы рассматривали ранее, исходит из модуля ngx_http_proxy_module и используется для проксирования по протоколу HTTP. Поскольку PHP-FPM работает по протоколу FastCGI, то использовать следует именно директивы из модуля ngx_http_fastcgi_module.
+
+Пример использования:
+
+server {
+  listen 80 default;
+
+  server_name _;
+
+  root /var/www/html;
+
+  index index.php index.html;
+
+  location ~* \.(jpg|jpeg|gif|png|css|js|ico|xml|html)$ {
+    try_files         $uri $uri/ /index.php?$query_string;
+    access_log        off;
+    log_not_found     off;
+    expires           1d;
+  }
+
+  location / {
+    client_max_body_size 8m;
+    client_body_buffer_size 128k;
+    try_files $uri $uri/ /index.php?$query_string;
+  }
+
+  location ~ \.php$ {
+    fastcgi_split_path_info ^(.+\.php)(/.+)$;
+    fastcgi_pass 127.0.0.1:9000;
+    fastcgi_index index.php;
+    include fastcgi_params; # может содержать директивы передачи параметров по протоколу FastCGI
+  }
+}
+-> конфиги php-fpm
+
+Теперь разберем основные конфигурационные файлы PHP-FPM. Из-за того, что PHP-FPM - это компонента над обычным PHP, то его конфигурационные файлы стоит искать там же, где хранятся конфигурационные файлы самого PHP. Для Ubuntu этой директорией выступает /etc/php/:
+
+.
+└── 7.2 # имя директории зависит от того, какая версия PHP на сервере. Может быть несколько, если по какой-то причине несколько версий PHP требуется держать на сервере
+    ├── cli # директория с конфигурационными файлами для PHP CLI команд, то есть то, что влияет на вызов команды `php` из консоли
+    │   ├── conf.d # здесь содержатся конфигурационные файлы для модулей PHP, связанные с PHP CLI. Как правило, содержат символические ссылки на файлы из `mods-available`
+    │   └── php.ini # конфигурационный файл с конфигурационными директивами для PHP CLI
+    ├── fpm
+    │   ├── conf.d # директория с конфигурационными файлами для модулей PHP, связанных с PHP-FPM. Как правило, содержит символические ссылки на файлы из `mods-available`
+    │   ├── php-fpm.conf # конфигурационный файл именно PHP-FPM
+    │   ├── php.ini # конфигурационный файл с конфигурационными директивами для PHP CLI, которые применяются именно при запросах через PHP-FPM
+    │   └── pool.d # директория с так называемыми pool, представляет из себя набор PHP-FPM процессов, которые слушают на своем порту и имеют свои конфигурационные файлы и параметры
+    └── mods-available # содержит файлы, которые используются для подключения расширений PHP
+Интерес здесь представляют именно файлы из fpm/pool.d, которые подключаются к файлу fpm/php-fpm.conf через директиву include (к примеру, include=/etc/php/7.2/fpm/pool.d/*.conf).
+
+Приведем пример такого файла и разберем некоторые директивы:
+
+[www]
+
+clear_env = no
+catch_workers_output = yes
+listen = 127.0.0.1:9000 ; определяет, как запросы извне будут попадать в этот pool. Кроме TCP-сокетов, как здесь, возможно использование Unix-сокетов.
+
+user = www-data
+group = www-data
+
+; определяет количество возможных процессов обработчиков и схему обработки
+pm = dynamic
+pm.max_children = 64
+pm.start_servers = 2
+pm.min_spare_servers = 2
+pm.max_spare_servers = 8
+
+; Используется при использовании Unix-сокетов
+;listen.owner = www-data
+;listen.group = www-data
+;listen.mode = 0660
+
+chdir = /
+
+# установка директив PHP, которые должны быть переопределены именно для этого pool
+php_admin_flag[short_open_tag] = Off
+php_admin_value[precision] = 14
+php_admin_value[output_buffering] = 4096
+php_admin_flag[zlib.output_compression] = Off
+php_admin_flag[implicit_flush] = Off
+php_admin_value[serialize_precision] = -1
+php_admin_flag[zend.enable_gc] = On
+php_admin_flag[expose_php] = Off
+
+;;;;;;;;;;;;;;;;;;;
+; Resource Limits ;
+;;;;;;;;;;;;;;;;;;;
+php_admin_value[max_execution_time] = 60
+php_admin_value[max_input_time] = 90
+php_admin_value[max_input_vars] = 2048
+php_admin_value[memory_limit] = 128M
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Error handling and logging ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+php_admin_value[error_reporting] = E_ALL & ~E_USER_DEPRECATED & ~E_DEPRECATED & ~E_STRICT
+php_admin_flag[display_errors] = Off
+php_admin_flag[display_startup_errors] = Off
+php_admin_flag[html_errors] = On
+php_admin_flag[log_errors] = On
+php_admin_value[error_log] = /var/log/fpm-php.www.log
+
+;;;;;;;;;;;;;;;;;
+; Data Handling ;
+;;;;;;;;;;;;;;;;;
+php_admin_value[variables_order] = "GPCS"
+php_admin_value[request_order] = "GP"
+php_admin_flag[register_argc_argv] = Off
+php_admin_flag[auto_globals_jit] = On
+php_admin_value[post_max_size] = 8M
+php_admin_value[default_mimetype] = "text/html"
+php_admin_value[default_charset] = "UTF-8"
+
+;;;;;;;;;;;;;;;;
+; File Uploads ;
+;;;;;;;;;;;;;;;;
+php_admin_flag[file_uploads] = On
+php_admin_value[upload_max_filesize] = 8M
+php_admin_value[max_file_uploads] = 20
+
+;[Date]
+php_admin_value[date.timezone] = UTC
+
+;[Assertion]
+php_admin_value[zend.assertions] = -1
+
+;[Tidy]
+;php_admin_flag[tidy.clean_output] = Off
+
+;[ldap]
+;php_admin_value[ldap.max_links] = -1
+
+;[opcache]
+;php_admin_value[opcache.enable] = 1
+;php_admin_value[opcache.enable_cli] = 0
+При использовании PHP-FPM стоит учитывать тот факт, что он не поддерживает .htaccess файлы. С одной стороны - это отрезает возможность гибкого использования PHP-FPM на веб-хостингах (пожалуй, одно из немногих мест, где используется этот файл), однако, как и с nginx, взамен мы получаем более производительное и прозрачное с точки зрения конфигурации решение.
+
+Полезные ссылки:
+Менеджер процессов FastCGI (FPM) (official docs)
+Nginx, Php-Fpm и что это вообще?
+Объясните, как работает php-fpm?
+fastcgi_pass и proxy_pass, различия
+Описание встроенных директив php.ini
+
+
