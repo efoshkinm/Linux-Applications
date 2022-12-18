@@ -1,0 +1,552 @@
+Задание:
+На вашем удаленном сервере установите и сконфигурируйте postfix аналогично тому образу, как вы делали в прошлом задании.
+На вашем удаленном сервере установите dovecot.
+Сконфигурируйте связку dovecot и postfix для принятия работы с dovecot SASL и для доступа к dovecot только по протоколу IMAP.
+Если у вас на сервере не создан пользователь rebrainme-mail, создайте его.
+Отправьте письмо от пользователя root@rebrainme.local пользователю rebrainme-mail@rebrainme.local из консоли (команду и вывод сохраните).
+Установите на вашем удаленном сервере утилиту mutt и сконфигурируйте ее для пользователя rebrainme-mail@rebrainme.local для отправки и чтения писем через локальные postfix и dovecot.
+От имени пользователя rebrainme-mail прочитайте отправленное ранее письмо.
+На проверку отправьте сохраненные команды, их выводы, конфигурационные файлы postfix, измененные в ходе конфигурации файлы dovecot и mutt.
+
+
+****************************************************************
+Решение
+****************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+27.07.2022 09:38
+2. На вашем удаленном сервере установите dovecot.
+apt-get install dovecot*
+либо
+install dovecot-core dovecot-imapd
+3. Сконфигурируйте связку dovecot и postfix для принятия работы с dovecot SASL и для доступа к dovecot только по протоколу IMAP.
+ Я не уверен что сделал все правильно.
+ 
+ Postfix
+
+vi /etc/postfix/master.cf
+submission inet n       -       -       -       -       smtpd
+   -o smtpd_sasl_type=dovecot
+   -o smtpd_sasl_path=private/auth
+   -o syslog_name=postfix/submission
+   -o smtpd_sasl_auth_enable=yes
+   -o smtpd_recipient_restrictions=permit_mynetworks,permit_sasl_authenticated,reject
+  -o smtpd_relay_restrictions=permit_sasl_authenticated,reject
+   -o milter_macro_daemon_name=ORIGINATING
+
+vi /etc/postfix/main.cf
+myhostname = mail.rebrainme.local
+mydestination = rebrainme.local, $myhostname, localhost.auto.internal, localhost
+mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
+inet_protocols = imap
+
+smtpd_sasl_path = private/auth
+smtpd_sasl_auth_enable = yes
+smtpd_sasl_type = dovecot
+smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination
+
+Dovecot
+
+vi /etc/dovecot/dovecot.conf
+disable_plaintext_auth = no 
+mail_privileged_group = mail
+mail_location = mbox:~/mail:INBOX=/var/mail/%u
+userdb {
+  driver = passwd
+}
+passdb {
+  args = %s
+  driver = pam
+}
+protocols = " imap"
+
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    group = postfix
+    mode = 0660
+    user = postfix
+  }
+}
+
+
+#ssl=required
+#ssl_cert = </etc/ssl/certs/mailcert.pem
+#ssl_key = </etc/ssl/private/mail.key
+
+
+
+systemctl start postfix
+systemctl restart dovecot
+
+
+4. Создайте пользователя
+root@epdbtlu34igo2pgvqmks:/etc/dovecot# cat /etc/passwd | grep rebrainme-mail
+rebrainme-mail:x:1001:1002:Rebrain,,,:/home/rebrainme-mail:/bin/bash
+root@epdbtlu34igo2pgvqmks:/etc/dovecot# 
+5. Отправьте письмо от пользователя root@rebrainme.local пользователю rebrainme-mail@rebrainme.local из консоли (команду и вывод сохраните).
+root@epdbtlu34igo2pgvqmks:/etc/dovecot# echo "This is the devcot letter!" | mail -s "Rebrain letter" -aFrom:Maksim\<root@rebrainme.local\> rebrainme-mail@rebrainme.local
+root@epdbtlu34igo2pgvqmks:/etc/dovecot# 
+
+6. Установите на вашем удаленном сервере утилиту mutt и сконфигурируйте ее для пользователя rebrainme-mail@rebrainme.local для отправки и чтения писем через локальные postfix и dovecot.
+apt-get install mutt
+rebrainme-mail@rebrainme:/var/spool/mail$ cat ~/.muttrc
+set from = rebrainme-mail@rebrainme.local
+set imap_user = rebrainme-mail@rebrainme.local
+set imap_pass = Rebrain
+set smtp_pass = Rebrain
+set realname = "Rebr"
+set smtp_url = smtp://rebrainme-mail@rebrainme.local
+set folder = imap://rebrainme-mail@rebrainme.local
+
+set spoolfile = /var/spool/mail/rebrainme-mail
+set mbox=+daedalu
+
+set use_from = yes
+set editor='nano'
+#set sort = reverse-threads
+#set sort_aux = last-date-received
+
+set fast_reply=yes
+set include=yes
+set forward_quote=yes
+set delete=yes
+
+set imap_keepalive  = 900
+set copy = no
+set move = no
+
+set header_cache    = ~/.mutt/cache/headers
+set message_cachedir    = ~/.mutt/cache/bodies
+#set certificate_file    = ~/.mutt/certificates
+
+set smtp_authenticators = 'plain'
+rebrainme-mail@rebrainme:/var/spool/mail$ 
+
+
+
+
+
+7. От имени пользователя rebrainme-mail прочитайте отправленное ранее письмо.
+Получилось прочитать письма
+q:Quit  d:Del  u:Undel  s:Save  m:Mail  r:Reply  g:Group  ?:Help
+   1   + Jul 27 Maksim          (   1) Rebrain letter
+   2   + Jul 27 root            (  19) Hello Rebrainme-mail
+   3   + Jul 27 root            (   2) Hello Rebrainme-mail!
+   4   + Jul 27 Maksim          (   1) Rebrain letter
+   5   + Jul 27 Maksim          (   1) Rebrain letter
+   6   + Jul 27 Maksim          (   1) Rebrain letter
+8. На проверку отправьте сохраненные команды, их выводы, конфигурационные файлы postfix, измененные в ходе конфигурации файлы dovecot и mutt.
+Единственное когда я хотел ответить обратно в root@rebrainme.local он сказал не знает такого пользователя... 
+Где нужно поправить?
+
+Mutt
+rebrainme-mail@rebrainme:/home/yc-user$ cat ~/.muttrc
+set from = rebrainme-mail@rebrainme.local
+set imap_user = rebrainme-mail@rebrainme.local
+set imap_pass = Rebrain
+set smtp_pass = Rebrain
+set realname = "Rebr"
+set smtp_url = smtp://rebrainme-mail@rebrainme.local
+set folder = imap://rebrainme-mail@rebrainme.local
+
+set spoolfile = /var/spool/mail/rebrainme-mail
+set mbox=+daedalu
+
+set use_from = yes
+set editor='nano'
+#set sort = reverse-threads
+#set sort_aux = last-date-received
+
+set fast_reply=yes
+set include=yes
+set forward_quote=yes
+set delete=yes
+
+set imap_keepalive  = 900
+set copy = no
+set move = no
+
+set header_cache    = ~/.mutt/cache/headers
+set message_cachedir    = ~/.mutt/cache/bodies
+#set certificate_file    = ~/.mutt/certificates
+
+set smtp_authenticators = 'plain'
+rebrainme-mail@rebrainme:/home/yc-user$ 
+
+
+
+POstfix/ main.cf
+root@rebrainme:/home/yc-user# cat /etc/postfix/main.cf |grep -v '#'
+
+
+
+smtpd_banner = $myhostname ESMTP $mail_name (Ubuntu)
+biff = no
+
+append_dot_mydomain = no
+
+
+readme_directory = no
+
+compatibility_level = 2
+
+smtpd_sasl_path = private/auth
+smtpd_sasl_auth_enable = yes
+smtpd_sasl_type = dovecot
+
+smtpd_tls_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
+smtpd_tls_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_tls_security_level=may
+
+smtp_tls_CApath=/etc/ssl/certs
+smtp_tls_security_level=may
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+
+
+smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
+myhostname = mail.rebrainme.local
+alias_maps = hash:/etc/aliases
+alias_database = hash:/etc/aliases
+myorigin = /etc/mailname
+mydestination = rebrainme.local, $myhostname, localhost.auto.internal, localhost
+relayhost = 
+mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
+mailbox_size_limit = 0
+recipient_delimiter = +
+inet_interfaces = loopback-only
+default_transport = error
+relay_transport = error
+inet_protocols = all
+root@rebrainme:/home/yc-user# 
+
+Master.cf
+root@rebrainme:/home/yc-user# cat /etc/postfix/master.cf |grep -v '#'
+smtp      inet  n       -       y       -       -       smtpd
+submission inet n       -       -       -       -       smtpd
+   -o smtpd_sasl_type=dovecot
+   -o smtpd_sasl_path=private/auth
+   -o syslog_name=postfix/submission
+   -o smtpd_sasl_auth_enable=yes
+   -o smtpd_recipient_restrictions=permit_mynetworks,permit_sasl_authenticated,reject
+   -o milter_macro_daemon_name=ORIGINATING
+pickup    unix  n       -       y       60      1       pickup
+cleanup   unix  n       -       y       -       0       cleanup
+qmgr      unix  n       -       n       300     1       qmgr
+tlsmgr    unix  -       -       y       1000?   1       tlsmgr
+rewrite   unix  -       -       y       -       -       trivial-rewrite
+bounce    unix  -       -       y       -       0       bounce
+defer     unix  -       -       y       -       0       bounce
+trace     unix  -       -       y       -       0       bounce
+verify    unix  -       -       y       -       1       verify
+flush     unix  n       -       y       1000?   0       flush
+proxymap  unix  -       -       n       -       -       proxymap
+proxywrite unix -       -       n       -       1       proxymap
+smtp      unix  -       -       y       -       -       smtp
+relay     unix  -       -       y       -       -       smtp
+        -o syslog_name=postfix/$service_name
+showq     unix  n       -       y       -       -       showq
+error     unix  -       -       y       -       -       error
+retry     unix  -       -       y       -       -       error
+discard   unix  -       -       y       -       -       discard
+local     unix  -       n       n       -       -       local
+virtual   unix  -       n       n       -       -       virtual
+lmtp      unix  -       -       y       -       -       lmtp
+anvil     unix  -       -       y       -       1       anvil
+scache    unix  -       -       y       -       1       scache
+postlog   unix-dgram n  -       n       -       1       postlogd
+maildrop  unix  -       n       n       -       -       pipe
+  flags=DRhu user=vmail argv=/usr/bin/maildrop -d ${recipient}
+uucp      unix  -       n       n       -       -       pipe
+  flags=Fqhu user=uucp argv=uux -r -n -z -a$sender - $nexthop!rmail ($recipient)
+ifmail    unix  -       n       n       -       -       pipe
+  flags=F user=ftn argv=/usr/lib/ifmail/ifmail -r $nexthop ($recipient)
+bsmtp     unix  -       n       n       -       -       pipe
+  flags=Fq. user=bsmtp argv=/usr/lib/bsmtp/bsmtp -t$nexthop -f$sender $recipient
+scalemail-backend unix	-	n	n	-	2	pipe
+  flags=R user=scalemail argv=/usr/lib/scalemail/bin/scalemail-store ${nexthop} ${user} ${extension}
+mailman   unix  -       n       n       -       -       pipe
+  flags=FR user=list argv=/usr/lib/mailman/bin/postfix-to-mailman.py
+  ${nexthop} ${user}
+
+root@rebrainme:/home/yc-user# 
+
+
+
+Dovecot
+root@rebrainme:/home/yc-user# cat /etc/dovecot/dovecot.conf |grep -v '#'
+disable_plaintext_auth = no
+mail_privileged_group = mail
+mail_location = mbox:~/mail:INBOX=/var/mail/%u
+userdb {
+  driver = passwd
+}
+passdb {
+  args = %s
+  driver = pam
+}
+protocols = " imap"
+
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    group = postfix
+    mode = 0660
+    user = postfix
+  }
+}
+
+
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 4
+27.07.2022 19:12
+Здравсвуйте! Выглядит всё правильно и как минимум IMAP работает, осталось убедится что работает SASL. Как это можно сделать?
+
+Единственное когда я хотел ответить обратно в root@rebrainme.local он сказал не знает такого пользователя... Где нужно поправить?
+
+Какая точно была ошибка, что в логах ? Удается ли отправить письма себе ?
+
+28.07.2022 08:23
+ВЫПОЛНЕНО 4
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+28.07.2022 08:23
+Я понял оно работает! Была проблема с наименованием хоста и файлом /etc/hosts Он его не резолвил. Все работает!
+
+Если поставить localhost он отправляет.
+
+Все рабоатет. Это была особенность яндекс облака. Он оказывается автоматически создает файл hosts. И сертификат у него на другой хост. Все спасибо!!!
+
+rebrainme-mail@rebrainme:~$ cat .muttrc 
+set from = rebrainme-mail@rebrainme.local
+set imap_user = rebrainme-mail@rebrainme.local
+set imap_pass = Rebrain
+set smtp_pass = Rebrain
+set realname = "Rebrinme-mail"
+set smtp_url = smtp://rebrainme.local:25
+set sort_aux = last-date-received
+set folder = imap://rebrainme.local:993
+
+set spoolfile = /var/spool/mail/rebrainme-mail
+set mbox=/home/rebrainme-mail/recieved
+
+set use_from = yes
+set editor='nano'
+#set sort = reverse-threads
+#set sort_aux = last-date-received
+
+set fast_reply=yes
+set include=yes
+set forward_quote=yes
+set delete=yes
+
+set imap_keepalive  = 900
+set copy = no
+set move = no
+
+set header_cache    = ~/.mutt/cache/headers
+set message_cachedir    = ~/.mutt/cache/bodies
+#set certificate_file    = ~/.mutt/certificates
+
+set smtp_authenticators = 'login'
+rebrainme-mail@rebrainme:~$ 
+
+
+root@rebrainme:/home/yc-user# cat /etc/hosts
+# Your system has configured 'manage_etc_hosts' as True.
+# As a result, if you wish for changes to this file to persist
+# then you will need to either
+# a.) make changes to the master file in /etc/cloud/templates/hosts.debian.tmpl
+# b.) change or remove the value of 'manage_etc_hosts' in
+#     /etc/cloud/cloud.cfg or cloud-config from user-data
+#
+127.0.1.1 epdbtlu34igo2pgvqmks.auto.internal epdbtlu34igo2pgvqmks
+127.0.0.1 localhost
+127.0.0.1 rebrainme.local rebrainme
+# The following lines are desirable for IPv6 capable hosts
+::1 localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 4
+29.07.2022 01:14
+Да, отлично что разобрались. Но как убедиться что SASL работает ?
+
+29.07.2022 01:15
+ВЫПОЛНЕНО 4
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+29.07.2022 01:15
+Честно не знаю. Я его отключил в postfix. Все равно все работает.... Подскажите как проверить?
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 4
+29.07.2022 23:45
+Вариантов проверки SASL несколько.
+
+прочитать ссылку про SASL в разделе полезных ссылок, там есть примеры.
+запустить mutt в режиме отладки, отправить через него письмо, прислать кусок лога про SASL.
+Если что не будет получаться, пишите на @oavdeev
+
+02.08.2022 10:08
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+02.08.2022 10:08
+Разобрался.
+
+Я поднял заново машину, все с нуля поставил. Пробовал, настроил.
+
+Вот лог с дебага.
+
+2022-08-02 07:04:58] 6> EHLO rebrainme.local^M
+[2022-08-02 07:04:58] 6< 250-rebrainme.local
+[2022-08-02 07:04:58] 6< 250-PIPELINING
+[2022-08-02 07:04:58] 6< 250-SIZE 10240000
+[2022-08-02 07:04:58] 6< 250-VRFY
+[2022-08-02 07:04:58] 6< 250-ETRN
+[2022-08-02 07:04:58] 6< 250-STARTTLS
+[2022-08-02 07:04:58] 6< 250-AUTH PLAIN
+[2022-08-02 07:04:58] 6< 250-ENHANCEDSTATUSCODES
+[2022-08-02 07:04:58] 6< 250-8BITMIME
+[2022-08-02 07:04:58] 6< 250-DSN
+[2022-08-02 07:04:58] 6< 250-SMTPUTF8
+[2022-08-02 07:04:58] 6< 250 CHUNKING
+[2022-08-02 07:04:58] 6> STARTTLS^M
+[2022-08-02 07:04:58] 6< 220 2.0.0 Ready to start TLS
+[2022-08-02 07:04:59] Certificate saved
+[2022-08-02 07:05:00] SSL/TLS connection using TLS1.3 (ECDHE-RSA/AES-256-GCM/AEAD)
+[2022-08-02 07:05:01] 6> EHLO rebrainme.local^M
+[2022-08-02 07:05:01] 6< 250-rebrainme.local
+[2022-08-02 07:05:01] 6< 250-PIPELINING
+[2022-08-02 07:05:01] 6< 250-SIZE 10240000
+[2022-08-02 07:05:01] 6< 250-VRFY
+[2022-08-02 07:05:01] 6< 250-ETRN
+[2022-08-02 07:05:01] 6< 250-AUTH PLAIN
+[2022-08-02 07:05:01] 6< 250-ENHANCEDSTATUSCODES
+[2022-08-02 07:05:01] 6< 250-8BITMIME
+[2022-08-02 07:05:01] 6< 250-DSN
+[2022-08-02 07:05:01] 6< 250-SMTPUTF8
+[2022-08-02 07:05:01] 6< 250 CHUNKING
+[2022-08-02 07:05:01] smtp_authenticate: Trying method plain
+[2022-08-02 07:05:01] SASL local ip: 10.129.0.46;32856, remote ip:10.129.0.46;25
+[2022-08-02 07:05:01] External SSF: 256
+[2022-08-02 07:05:01] External authentication name: rebrainme-mail
+[2022-08-02 07:05:01] mutt_sasl_cb_authname: getting authname for rebrainme.local:25
+[2022-08-02 07:05:01] mutt_sasl_cb_authname: getting user for rebrainme.local:25
+[2022-08-02 07:05:01] mutt_sasl_cb_pass: getting password for rebrainme-mail@rebrainme.local:25
+[2022-08-02 07:05:01] Authenticating (PLAIN)...
+[2022-08-02 07:05:01] 6> AUTH PLAIN cmVicmFpbm1lLW1haWwAcmVicmFpbm1lLW1haWwAcmVicmFpbm1lLW1haWw=^M
+[2022-08-02 07:05:01] 6< 235 2.7.0 Authentication successful
+[2022-08-02 07:05:01] 6> MAIL FROM:<rebrainme-mail@rebrainme.local>^M
+[2022-08-02 07:05:01] 6< 250 2.1.0 Ok
+[2022-08-02 07:05:01] 6> RCPT TO:<root@rebrainme.local>^M
+[2022-08-02 07:05:01] 6< 250 2.1.5 Ok
+[2022-08-02 07:05:01] Sending message... 0K/0.3K (0%)
+[2022-08-02 07:05:01] 6> DATA^M
+[2022-08-02 07:05:01] 6< 354 End data with <CR><LF>.<CR><LF>
+[2022-08-02 07:05:01] 6> .^M
+[2022-08-02 07:05:02] 6< 250 2.0.0 Ok: queued as E8AE327DAA
+[2022-08-02 07:05:02] 6> QUIT^M
+[2022-08-02 07:05:02] Mail sent.
+[2022-08-02 07:05:03] mutt_free_body: unlinking /tmp/mutt-rebrainme-1001-10288-18480150811640409616.
+[2022-08-02 07:05:06] Mailbox is unchanged.
+[2022-08-02 07:05:06] mutt_buffer_pool_free: 5 of 5 returned to pool
+Работает SASL
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 5
+03.08.2022 11:03
+Здравствуйте, всё отлично.
+
+
+*******************************************************************
+Теория
+*******************************************************************
+LNXA-03 02: Mail. Dovecot
+Описание:
+В предыдущем задании мы разобрали, как отправляются электронные письма, какой протокол для этого используется и как читать письма на самом сервере. Однако этот способ чтения откровенно неудобный и требует заходить на сервер для получения писем. Так подумали и создатели протоколов POP3 (Post Office Protocol version 3) и IMAP (Internet message Access Protocol), которые хотели получать свои письма с удаленного сервера к себе в почтовый клиент, тем более что системный администратор банально не хотел давать доступа на сервер, чтобы прочитать почту.
+
+Именно эти 2 протокола на данный момент поддерживаются всеми почтовыми сервисами. Сразу возникает вопрос — а зачем 2 разных протокола, если для отправки писем существует один протокол (де-факто используется один, будем точны)?
+
+Разница между протоколами состоит в том, что они делают с письмами. POP3 скачивает письмо с сервера, сохраняет его на компьютере пользователя и удаляет удаленное письмо. IMAP же при получении письма на сервер получает только заголовок письма. То есть разница сводится к тому, хотите ли вы хранить письма для централизованного доступа на сервере, либо просто забрать письмо и освободить сервер от хранения почты. Естественно, оба этих протокола имеют защищенные при помощи TLS версии. Они называются по аналогии с HTTPS (где S — это Secure) — POP3S и IMAPS, соответственно.
+
+Как мы говорили в предыдущем задании, типичный сервер электронной почты состоит из 2 компонент:
+
+MTA (Mail Transfer Agent) — агент пересылки почты, в задачи которого входит прием и передача почты. Очень часто (в Linux / UNIX) МТА называют также почтовым сервером. MTA работает по протоколу SMTP, и его одного, в принципе, уже достаточно для создания системы электронной почты, однако чтение почты с такого сервера требует знать, как это делать.
+MDA (Mail Delivery Agent) — агент доставки почты. Его задача — по запросу почтового клиента передать ему почту из почтового ящика на сервере.
+Задачей MDA является как раз хранение полученного письма для последующего удаленного доступа пользователя к нему по одному из перечисленных выше протоколов.
+
+Как раз в этом задании мы разберем, как настроить свой MDA на примере инструмента dovecot, который научим общаться с postfix для доступа к письмам, присланным на наш MTA.
+
+Dovecot является популярным решением для организации MDA в собственной архитектуре за счет достаточно лаконичного конфига, приоритезации сервера в безопасность и возможности интеграции с postfix для централизованной аутентификации пользователей при помощи SASL (Simple Authentication and Security Layer). Кроме того, данный сервер позволяет использовать большое количество хранилищ для аутентификации — от обычного /etc/passwd до хранения в СУБД.
+
+Приложение dovecot является модульным, то есть, если вам нужно получать почту только по IMAP и просто производить аутентификацию пользователей согласно файлу /etc/passwd, вы можете установить пакет для работы только с IMAP и все будет работать, как вам нужно.
+
+Все конфигурационные файлы этого сервера располагаются в директории /etc/dovecot/ с центральным конфигурационным файлом /etc/dovecot/dovecot.conf, который по умолчанию выглядит прямо минималистично, если отбросить все комментарии:
+
+# egrep -v "(#.*|^$)" /etc/dovecot/dovecot.conf
+!include_try /usr/share/dovecot/protocols.d/*.protocol
+dict {
+}
+!include conf.d/*.conf
+!include_try local.conf
+Как несложно догадаться, основные файлы конфигурации разбиты по файлам, которые связаны с конкретной функциональностью сервера. Разберем структуру директории dovecot с конфигурационными файлами:
+
+/etc/dovecot# tree .
+.
+├── conf.d
+│   ├── 10-auth.conf # данный файл определяет параметры авторизации, как правило, внутри включает в себя auth-* файлы, но в реальности подключает по умолчанию только `auth-system.conf.ext`
+│   ├── 10-director.conf # управляет настройками director — своеобразной proxy для подключений, которая позволяет одному пользователю несколько раз одновременно подключаться к серверу через тот же сокет для экономии ресурсов
+│   ├── 10-logging.conf # отвечает за параметры журналирования работы системы
+│   ├── 10-mail.conf # параметры того, где должны храниться приходящие сообщения, в зависимости от их назначения, в том числе прикрепления к письмам (файлы, документы)
+│   ├── 10-master.conf # конфигурационный файл, в котором описываются основные параметры — на каком порту ожидаются подключения по конкретным протоколам, определяются параметры каждого сервиса (как почтового, так и аутентфикации)
+│   ├── 10-ssl.conf # определяет параметры безопасного протокола. По умолчанию режим SSL включен и использует ключи, указанные ниже в директории `private`
+│   ├── 10-tcpwrapper.conf # используется для конфигурации работы файлов `/etc/hosts.(allow|deny)` для ограничения доступа к серверу от конкретного хоста/сети для конкретного протокола
+│   ├── 15-lda.conf # параметры работы LDA (Local Delivery Agent). Может использоваться для конфигурации работы с MTA
+│   ├── 15-mailboxes.conf # позволяет определить почтовые разделы типа «отправлено», «входящие», «мусор»
+│   ├── 20-imap.conf # параметры работы с IMAP протоколом
+│   ├── 20-pop3.conf # параметры работы с POP3 протоколом
+│   ├── 90-acl.conf # определение политик доступа — позволяет создать общие почтовые ящики, доступные нескольким пользователям. Производится при помощи плагинов
+│   ├── 90-plugin.conf # позволяет, если необходимо, подключить дополнительные плагины, расширяя функциональность MDA
+│   ├── 90-quota.conf # при помощи плагинов позволяет создавать ограничения для пользователей по месту хранения писем
+│   ├── auth-checkpassword.conf.ext # определяет метод проверки данных подключения, который запускает конкретный скрипт для проверки пароля и, если необходимо, пользователей
+│   ├── auth-deny.conf.ext # определяет параметры, по которым пользователя запрещена аутентификация на сервере
+│   ├── auth-dict.conf.ext # параметры работы аутентификации при помощи словарей (часто используют параметры из файла dovecot-dict-auth.conf.ext), в том числе в формате JSON или даже СУБД
+│   ├── auth-master.conf.ext # конфигурация master пользователей, которые могут заходить от имени любого другого пользователя. Определяет конкретный backend, в котором хранятся только master пользователи (можно найти такой бэкенд по наличию флага `master = yes` в определении passdb)
+│   ├── auth-passwdfile.conf.ext # позволяет сконфигурировать работу с passwd файлами типа `/etc/passwd` для подтверждения пользователя или пароля
+│   ├── auth-sql.conf.ext # позволяет настроить аутентификацию при помощи СУБД. Часто ссылается на файл `/etc/dovecot/dovecot-sql.conf.ext`
+│   ├── auth-static.conf.ext # используется для случая, если для аутентификации используются статичные данные, типа захардкорженного пароля или SSL-сертификата
+│   ├── auth-system.conf.ext # определяет параметры работы с пользователями ОС (как правило, здесь описывается работа с PAM, /etc/passwd и прочими стандартными для Linux методами аутентфикации)
+│   └── auth-vpopmail.conf.ext # используется для аутентификации при помощи vpopmail (на данный момент пациент скорее мертв, чем жив)
+├── dovecot.conf # главный конфигурационный файл, который передается при запуске dovecot
+├── dovecot-dict-auth.conf.ext # конфигурационный файл для работы со словарями в формате файлов
+├── dovecot-dict-sql.conf.ext # аналогично, но с хранением в СУБД
+├── dovecot-sql.conf.ext # конфигурационный файл для работы с пользователями и паролями, хранимыми в СУБД
+└── private # используется для хранения SSL-сертификатов для работы по TLS. Как видно, по умолчанию используется системный самоподписанный сертификат
+    ├── dovecot.key -> /etc/ssl/private/ssl-cert-snakeoil.key
+    └── dovecot.pem -> /etc/ssl/certs/ssl-cert-snakeoil.pem
+Как видно, dovecot позволяет использовать большое количество бэкендов для проверки пользователей и паролей одновременно, а также позволяет расширять возможности за счет дополнительных пакетов (к примеру, для поддержки работы с необходимой конкретной СУБД). По умолчанию же dovecot настроен на работу аутентификации как минимум через PAM, что позволяет использовать нам тот же пароль, что и для входа в систему. Для нашего вводного сценария такого подхода хватит вполне.
+
+Как мы говорили, postfix может использовать dovecot в роли SASL провайдера, то есть определять, как аутентифицировать этого пользователя для отправки письма. Это позволяет нам настроить аутентификацию только в одном сервисе, в то время как второй будет перекладывать запросы на аутентификацию на плечи SASL провайдера. Для этого требуется определить параметр postfix smtpd_sasl_type=dovecot и параметр smtpd_sasl_path=private/auth, который определяет путь до auth_socket, определенного в файле conf.d/10-master.conf.
+
+На этом базовое знакомство с сервером dovecot и с почтовыми серверами можно считать оконченным в теории, но не на практике. Кроме того, как мы говорили, реальные почтовые сервера содержат ряд других необходимых компонент, таких как средства для борьбы со спамом или взаимодействия с антивирусом. Глобально опыт показывает, что поддержка своей инфраструктуры почты — та еще боль, даже если использовать готовые решения, которые проводят за ручку в процессе конфигурации. Как и поддержка своего DNS, своя email инфраструктура требует очень глубокого знания всех нюансов работы серверов с точки зрения безопасности, что в противном случае может приводить к довольно опасным последствиям.
+
+Полезные ссылки:
+Что такое POP3, SMTP и IMAP
+Dovecot (official page)
+User Databases (userdb)
+Dovecot plugins
+CheckPassword authentication in Dovecot: a practical example in Shell
+Postfix SASL Howto
+Сервер Dovecot (ubuntu rus wiki)
+How To Set Up a Postfix E-Mail Server with Dovecot
+Установка и настройка почтового клиента mutt на Linux и FreeBSD
+
+
