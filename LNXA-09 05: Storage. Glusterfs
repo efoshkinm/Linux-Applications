@@ -1,0 +1,448 @@
+Задание:
+Установите утилиты для работы с GlusterFS сервером на вашем удаленном сервере.
+Приведите адрес вашего удаленного сервера и локального сервера (можно получить, сделав запрос curl ifconfig.io).
+Настройте GlusterFS на удаленном и локальном сервере в режиме распределенного тома (Distributed).
+Примонтируйте настроенный GlusterFS том в директорию /mnt/ на вашем локальном сервере.
+В директории /mnt создайте файлы rebraime{0,1,2,3,4}. Выведите список файлов в директории.
+На локальном и удаленном серверах выведите список всех файлов в директории GlusterFS тома.
+Отправьте на проверку вывод консоли с локального (префикс client) и удаленного серверов (префикс server).
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+29.11.2022 11:08
+1. Установите утилиты для работы с GlusterFS сервером на вашем удаленном сервере.
+address: 84.201.179.43
+sudo apt install  glusterfs-common glusterfs-server
+systemctl start glusterd
+systemctl status glusterd
+● glusterd.service - GlusterFS, a clustered file-system server
+     Loaded: loaded (/lib/systemd/system/glusterd.service; disabled; vendor preset: enabled)
+     Active: active (running) since Mon 2022-11-28 19:40:53 UTC; 8s ago
+       Docs: man:glusterd(8)
+    Process: 8251 ExecStart=/usr/sbin/glusterd -p /var/run/glusterd.pid --log-level $LOG_LEVEL $GLUSTERD_OPTIONS (code=exited, status=0/SUCCESS)
+   Main PID: 8253 (glusterd)
+      Tasks: 9 (limit: 2310)
+     Memory: 4.9M
+     CGroup: /system.slice/glusterd.service
+             └─8253 /usr/sbin/glusterd -p /var/run/glusterd.pid --log-level INFO
+
+
+2. Приведите адрес вашего удаленного сервера и локального сервера (можно получить, сделав запрос curl ifconfig.io).
+remote server
+curl ifconfig.io
+84.201.179.43
+
+local server
+curl ifconfig.io
+195.16.40.90
+
+3. Настройте GlusterFS на удаленном и локальном сервере в режиме распределенного тома (Distributed).
+Сохранил на обоих серверах в файле /etc/hosts
+84.201.179.43  remote_gluster
+195.16.40.90 local_gluster
+
+На докальном сервере установил 
+sudo apt install  glusterfs-common glusterfs-server
+
+systemctl start glusterd
+systemctl status glusterd
+● glusterd.service - GlusterFS, a clustered file-system server
+     Loaded: loaded (/lib/systemd/system/glusterd.service; disabled; vendor preset: enabled)
+     Active: active (running) since Mon 2022-11-28 19:55:32 UTC; 1s ago
+       Docs: man:glusterd(8)
+    Process: 2742 ExecStart=/usr/sbin/glusterd -p /var/run/glusterd.pid --log-level $LOG_LEVEL $GLUSTERD_OPTIONS (>
+   Main PID: 2753 (glusterd)
+      Tasks: 9 (limit: 1066)
+     Memory: 8.3M
+     CGroup: /system.slice/glusterd.service
+             └─2753 /usr/sbin/glusterd -p /var/run/glusterd.pid --log-level INFO
+
+Nov 28 19:55:30 ubuntu-server systemd[1]: Starting GlusterFS, a clustered file-system server...
+Nov 28 19:55:32 ubuntu-server systemd[1]: Started GlusterFS, a clustered file-system server.
+
+
+
+gluster peer probe  remote_gluster
+gluster peer status
+Number of Peers: 1
+
+Hostname: 84.201.179.43
+Uuid: e6a19b82-4341-4bc7-ac51-a2eba83ab976
+State: Peer in Cluster (Connected)
+
+У меня по интернету получилось доступен только удаленный сервер, а обратно, из-за ната гластер не может проскочить
+С удаленного сервера статус был disconnected
+gluster peer status
+Number of Peers: 1
+
+Hostname: local_gluster
+Uuid: 4f27b35f-3559-491b-b67e-d883b0990bca
+State: Peer in Cluster (Disconnected)
+
+
+Я решил поднять впн, снова чтобы не было проблем. Воспользовался тинком, так как он мне нравится.
+Remote server
+root@epd4gvmpiu19ksohtila:/etc/tinc/glusterfs# ll
+total 28
+drwxr-xr-x 3 root root 4096 Nov 29 07:04 ./
+drwxr-xr-x 3 root root 4096 Nov 29 06:47 ../
+drwxr-xr-x 2 root root 4096 Nov 29 07:02 hosts/
+-rw------- 1 root root 3248 Nov 29 06:51 rsa_key.priv
+-rw-r--r-- 1 root root   67 Nov 29 07:04 tinc.conf
+-rwxr-xr-x 1 root root   70 Nov 29 06:50 tinc-down*
+-rwxr-xr-x 1 root root   68 Nov 29 06:49 tinc-up*
+
+
+root@epd4gvmpiu19ksohtila:/etc/tinc/glusterfs# cat tinc.conf 
+Name = glusterfs_remote
+AddressFamily = ipv4
+Device = /dev/net/tun
+root@epd4gvmpiu19ksohtila:/etc/tinc/glusterfs# cat tinc-up
+ip link set $INTERFACE up
+ip addr add 192.168.3.1/24 dev $INTERFACE
+root@epd4gvmpiu19ksohtila:/etc/tinc/glusterfs# cat tinc-down
+ip addr del 192.168.3.1/24 dev $INTERFACE
+ip link set $INTERFACE down
+root@epd4gvmpiu19ksohtila:/etc/tinc/glusterfs/hosts# cat glusterfs_local 
+Address = 195.16.40.90
+Subnet = 192.168.3.2
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAv6szIFpc2LQslJVYVJgaJzBedPcLFep7ELGw+kIQA5c3/f/IoZj9
+8lddyacCJcNQ6T3guUyndbIZCAcnx9UMiuhLmtLXX+n/c3T+82W/WYJTHcSl8WAY
+zqFuFEr0GrccS4AzP0KnuENfINXzR6pKtFiH4m39mEzoARCWxy2o2RyeYJieJwqP
+GWqoc4/OticjBTL8C4OYLZsrSQheClTrl0potU5ut/MHisqCmBA9Tj7sAbL37hTX
+siIS8lhWQSfCBF8xNcqxjPfbqsCKrUh+zt0Ms5pTItL+fp/YM2qVkQ01uwciJY7O
+0fY5OJdlXNf3s/ggmTWLFHi8dvgXPyAE0vDgKagDkjk73E+MJfTYaHTj2GxwzXZ4
+TTeR6wWBR9BSD2mQ5I/2XBy4eHktWXItTkK1CpmFESUOtLNRX7Crm4uzkXgMZM9m
+pfPj9q5fqfTtFJnENjaPK2n37lSROcatVz0YC1DCdop5PNfn+54sumIEnyqg7nGB
+ID8T+hSp0iMLoZKTqtnP3jEeTFODZXoqXLM/nT+UOsVkP46ynLwSeEeS6kqsDVIH
+P2XO2pwt+rJ/58p2chxDTLzWFPtxXmpm6zj0lMGPFiOylRIXs6+u/J4zFHWWGqUg
+Uscdr8ktCETWFYcYwiaeKkAsm3C2AVQFer3JlbiKUUNyS5aamTlXIBMCAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+root@epd4gvmpiu19ksohtila:/etc/tinc/glusterfs/hosts# cat glusterfs_remote 
+Address = 84.201.179.43
+Subnet = 192.168.3.1
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAsz1vDJ4DXHIcbgRM8GV7BEVXxmeg4L53iJtDTBRqt4/gVmAMSBFi
+sQnvMnuN4dHYd2jB+KA5jl5aF9gizRDnNwJU1/n7iaRC3iTbUUNSam3nm8Ohtofw
+oxF8AqNxSc5vRINUcB+4pzduJj+3Ezr9JDfushQTpyFtBDqoluXtIYpqZNo1FSIG
+FBBUZj1luMYlrwbL1S+NixNCx6TOgQb3Xi2hESxNIeeOAwU3ePrIkTFS/SQ69MlS
+FxwDNLjFQZfq2w4Ee4MruKUIHGvMSp2Ps+aGLscqzn22YBL564hCNiraVY6e3Wns
+EuhI33iZzu2OBb8QcPEE8ud8Dull4yeeamLJRAl2H0Ae6QJVYFYWZgWkTHPNbTJV
+mCgCBhbLwqc7ZxSlA8u01vhKN2Ji7UvHZUG2d5ZnyUp4xiWSv5yw+HzSaNxPMb0Y
+VxgZY9vIwGpUgFhf0dBh3OmWztf+hNZqfooq/H1/XExzdoWYtMkTKDAOLSFH+Rlz
+IRFXu9QoGSa5p+BmgzssNxB9TpoR/9takcszPubnQI91YmCeEXCl4mNcc+aKZZW4
+leXN73cv22lLwzrnl894HMn0op4VnvVOcAuSoqNk9geVu3RmBIbtxSYupN2xslJ5
+jqBot2d9BQRdgd7LAb5kKot7eXP2JHEDSXEe/DLwwXYJ14XW/zbTkUECAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+
+Генерировал ключи
+tincd -n glusterfs -K4096
+
+
+Настройка локальной виртуалки
+root@ubuntu-server:/etc/tinc/glusterfs# ll
+total 28
+drwxr-xr-x 3 root root 4096 Nov 29 07:03 ./
+drwxr-xr-x 3 root root 4096 Nov 29 06:54 ../
+drwxr-xr-x 2 root root 4096 Nov 29 06:57 hosts/
+-rw------- 1 root root 3248 Nov 29 06:55 rsa_key.priv
+-rw-r--r-- 1 root root   95 Nov 29 06:54 tinc.conf
+-rwxr-xr-x 1 root root   71 Nov 29 06:59 tinc-down*
+-rwxr-xr-x 1 root root   69 Nov 29 06:58 tinc-up*
+
+root@ubuntu-server:/etc/tinc/glusterfs# cat tinc.conf 
+Name = glusterfs_local
+ConnectTo = glusterfs_remote
+Device = /dev/net/tun
+AddressFamily = ipv4
+root@ubuntu-server:/etc/tinc/glusterfs# cat tinc-up
+ip link set $INTERFACE up
+ip addr add 192.168.3.2/24 dev $INTERFACE
+
+root@ubuntu-server:/etc/tinc/glusterfs# cat tinc-down 
+ip addr del 192.168.3.2/24 dev $INTERFACE
+ip link set $INTERFACE down
+
+root@ubuntu-server:/etc/tinc/glusterfs# cat hosts/glusterfs_remote 
+Address = 84.201.179.43
+Subnet = 192.168.3.1
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAsz1vDJ4DXHIcbgRM8GV7BEVXxmeg4L53iJtDTBRqt4/gVmAMSBFi
+sQnvMnuN4dHYd2jB+KA5jl5aF9gizRDnNwJU1/n7iaRC3iTbUUNSam3nm8Ohtofw
+oxF8AqNxSc5vRINUcB+4pzduJj+3Ezr9JDfushQTpyFtBDqoluXtIYpqZNo1FSIG
+FBBUZj1luMYlrwbL1S+NixNCx6TOgQb3Xi2hESxNIeeOAwU3ePrIkTFS/SQ69MlS
+FxwDNLjFQZfq2w4Ee4MruKUIHGvMSp2Ps+aGLscqzn22YBL564hCNiraVY6e3Wns
+EuhI33iZzu2OBb8QcPEE8ud8Dull4yeeamLJRAl2H0Ae6QJVYFYWZgWkTHPNbTJV
+mCgCBhbLwqc7ZxSlA8u01vhKN2Ji7UvHZUG2d5ZnyUp4xiWSv5yw+HzSaNxPMb0Y
+VxgZY9vIwGpUgFhf0dBh3OmWztf+hNZqfooq/H1/XExzdoWYtMkTKDAOLSFH+Rlz
+IRFXu9QoGSa5p+BmgzssNxB9TpoR/9takcszPubnQI91YmCeEXCl4mNcc+aKZZW4
+leXN73cv22lLwzrnl894HMn0op4VnvVOcAuSoqNk9geVu3RmBIbtxSYupN2xslJ5
+jqBot2d9BQRdgd7LAb5kKot7eXP2JHEDSXEe/DLwwXYJ14XW/zbTkUECAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+root@ubuntu-server:/etc/tinc/glusterfs# cat hosts/glusterfs_local 
+Address = 195.16.40.90
+Subnet = 192.168.3.2
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAv6szIFpc2LQslJVYVJgaJzBedPcLFep7ELGw+kIQA5c3/f/IoZj9
+8lddyacCJcNQ6T3guUyndbIZCAcnx9UMiuhLmtLXX+n/c3T+82W/WYJTHcSl8WAY
+zqFuFEr0GrccS4AzP0KnuENfINXzR6pKtFiH4m39mEzoARCWxy2o2RyeYJieJwqP
+GWqoc4/OticjBTL8C4OYLZsrSQheClTrl0potU5ut/MHisqCmBA9Tj7sAbL37hTX
+siIS8lhWQSfCBF8xNcqxjPfbqsCKrUh+zt0Ms5pTItL+fp/YM2qVkQ01uwciJY7O
+0fY5OJdlXNf3s/ggmTWLFHi8dvgXPyAE0vDgKagDkjk73E+MJfTYaHTj2GxwzXZ4
+TTeR6wWBR9BSD2mQ5I/2XBy4eHktWXItTkK1CpmFESUOtLNRX7Crm4uzkXgMZM9m
+pfPj9q5fqfTtFJnENjaPK2n37lSROcatVz0YC1DCdop5PNfn+54sumIEnyqg7nGB
+ID8T+hSp0iMLoZKTqtnP3jEeTFODZXoqXLM/nT+UOsVkP46ynLwSeEeS6kqsDVIH
+P2XO2pwt+rJ/58p2chxDTLzWFPtxXmpm6zj0lMGPFiOylRIXs6+u/J4zFHWWGqUg
+Uscdr8ktCETWFYcYwiaeKkAsm3C2AVQFer3JlbiKUUNyS5aamTlXIBMCAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+tincd -n glusterfs -K4096
+
+
+Продолжаем настройку гластера
+
+Удаляем старого пира на удаленном хосте
+root@epd4gvmpiu19ksohtila:/etc/tinc/glusterfs# gluster peer status
+Number of Peers: 1
+
+Hostname: local_gluster
+Uuid: 4f27b35f-3559-491b-b67e-d883b0990bca
+State: Peer in Cluster (Disconnected)
+root@epd4gvmpiu19ksohtila:/etc/tinc/glusterfs# gluster peer detach
+
+Usage:
+peer detach { <HOSTNAME> | <IP-address> } [force]
+
+root@epd4gvmpiu19ksohtila:/etc/tinc/glusterfs# gluster peer detach local_gluster
+All clients mounted through the peer which is getting detached need to be remounted using one of the other active peers in the trusted storage pool to ensure client gets notification on any changes done on the gluster configuration and if the same has been done do you want to proceed? (y/n) y
+peer detach: success
+root@epd4gvmpiu19ksohtila:/etc/tinc/glusterfs# gluster peer status
+Number of Peers: 0
+
+
+
+Удаляем старого пира на локальном хосте
+root@ubuntu-server:/etc/tinc/glusterfs# gluster peer status
+Number of Peers: 1
+
+Hostname: 84.201.179.43
+Uuid: e6a19b82-4341-4bc7-ac51-a2eba83ab976
+State: Peer in Cluster (Connected)
+root@ubuntu-server:/etc/tinc/glusterfs# gluster peer detach 84.201.179.43
+All clients mounted through the peer which is getting detached need to be remounted using one of the other active peers in the trusted storage pool to ensure client gets notification on any changes done on the gluster configuration and if the same has been done do you want to proceed? (y/n) y
+peer detach: success
+root@ubuntu-server:/etc/tinc/glusterfs# gluster peer status
+Number of Peers: 0
+
+
+
+Создаем заново соседство пиров
+root@ubuntu-server:/etc/tinc/glusterfs# gluster peer probe 192.168.3.1
+peer probe: success. 
+
+И на удаленном сервере он сам установил соседство
+root@epd4gvmpiu19ksohtila:/etc/tinc/glusterfs# gluster peer status
+Number of Peers: 1
+
+Hostname: 192.168.3.2
+Uuid: 4f27b35f-3559-491b-b67e-d883b0990bca
+State: Peer in Cluster (Connected)
+
+Отлично, идем дальше!
+
+Создаем папку под гластерфс
+mkdir /rebrainme
+
+gluster volume create rebrainme_gluster 192.168.3.1:/rebrainme 192.168.3.2:/rebrainme force
+volume create: rebrainme_gluster: success: please start the volume to access data
+root@ubuntu-server:/# 
+
+gluster volume info
+ 
+Volume Name: rebrainme_gluster
+Type: Distribute
+Volume ID: 2e4fe954-751a-4717-8a38-e609dec717cc
+Status: Created
+Snapshot Count: 0
+Number of Bricks: 2
+Transport-type: tcp
+Bricks:
+Brick1: 192.168.3.1:/rebrainme
+Brick2: 192.168.3.2:/rebrainme
+Options Reconfigured:
+transport.address-family: inet
+storage.fips-mode-rchecksum: on
+nfs.disable: on
+
+gluster volume status
+Volume rebrainme_gluster is not started
+ 
+gluster volume start rebrainme_gluster
+volume start: rebrainme_gluster: success
+
+gluster volume status
+Status of volume: rebrainme_gluster
+Gluster process                             TCP Port  RDMA Port  Online  Pid
+------------------------------------------------------------------------------
+Brick 192.168.3.1:/rebrainme                49152     0          Y       10242
+Brick 192.168.3.2:/rebrainme                49152     0          Y       4224 
+ 
+Task Status of Volume rebrainme_gluster
+------------------------------------------------------------------------------
+There are no active volume tasks
+
+4. Примонтируйте настроенный GlusterFS том в директорию /mnt/ на вашем локальном сервере.
+mount -t glusterfs 192.168.3.1:/rebrainme_gluster /mnt
+Причем у меня с первого раза не получалось, потому что при монтировании гластера нужно было указывать не путь к каталогу, а название volume.
+df -h /mnt
+Filesystem                      Size  Used Avail Use% Mounted on
+192.168.3.1:/rebrainme_gluster   31G  7.7G   23G  26% /mnt
+
+5. В директории /mnt создайте файлы rebraime{0,1,2,3,4}. Выведите список файлов в директории.
+cd /mnt
+root@ubuntu-server:/mnt# for x in {0..4};do dd if=/dev/urandom of=/mnt/rebrainme$x bs=1M count=$x;done
+0+0 records in
+0+0 records out
+0 bytes copied, 0.00234659 s, 0.0 kB/s
+1+0 records in
+1+0 records out
+1048576 bytes (1.0 MB, 1.0 MiB) copied, 0.941734 s, 1.1 MB/s
+2+0 records in
+2+0 records out
+2097152 bytes (2.1 MB, 2.0 MiB) copied, 0.0368162 s, 57.0 MB/s
+3+0 records in
+3+0 records out
+3145728 bytes (3.1 MB, 3.0 MiB) copied, 2.85749 s, 1.1 MB/s
+4+0 records in
+4+0 records out
+4194304 bytes (4.2 MB, 4.0 MiB) copied, 0.0509241 s, 82.4 MB/s
+
+ll -h
+total 11M
+drwxr-xr-x  3 root root 4.0K Nov 29 08:05 ./
+drwxr-xr-x 20 root root 4.0K Nov 23 03:42 ../
+-rw-r--r--  1 root root    0 Nov 29 08:05 rebrainme0
+-rw-r--r--  1 root root 1.0M Nov 29 08:05 rebrainme1
+-rw-r--r--  1 root root 2.0M Nov 29 08:05 rebrainme2
+-rw-r--r--  1 root root 3.0M Nov 29 08:05 rebrainme3
+-rw-r--r--  1 root root 4.0M Nov 29 08:05 rebrainme4
+
+6. На локальном и удаленном серверах выведите список всех файлов в директории GlusterFS тома.
+На удаленном сервере
+ll
+total 4120
+drwxr-xr-x  3 root root    4096 Nov 29 08:05 ./
+drwxr-xr-x 19 root root    4096 Nov 29 07:44 ../
+drw-------  9 root root    4096 Nov 29 08:05 .glusterfs/
+-rw-r--r--  2 root root 1048576 Nov 29 08:05 rebrainme1
+-rw-r--r--  2 root root 3145728 Nov 29 08:05 rebrainme3
+
+На локальном сервере
+ ll /rebrainme/
+total 6172
+drwxr-xr-x  3 root root    4096 Nov 29 08:05 ./
+drwxr-xr-x 20 root root    4096 Nov 23 03:42 ../
+drw------- 10 root root    4096 Nov 29 08:05 .glusterfs/
+-rw-r--r--  2 root root       0 Nov 29 08:05 rebrainme0
+-rw-r--r--  2 root root 2097152 Nov 29 08:05 rebrainme2
+-rw-r--r--  2 root root 4194304 Nov 29 08:05 rebrainme4
+
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+30.11.2022 09:20
+Добрый день!
+
+"Я решил поднять впн, снова чтобы не было проблем. Воспользовался тинком, так как он мне нравится" - отличный выбор и оперативное решение возникшей проблемы, т.е. "бизнес-подход".
+
+Отличные знание темы и выполнение задания, оперативное устранение возникших ограничений, файлы распределились между узлами без дублирования, замечаний и вопросов нет!
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+
+LNXA-09 05: Storage. Glusterfs
+Описание:
+Сегодня поговорим о сетевой файловой системе GlusterFS. GlusterFS — распределенная, линейно масштабируемая файловая система, которая позволяет объединить ресурсы хранения на разных серверах. Работает по протоколам InfiniBand или TCP/IP и, в отличие от NFS, использует пользовательское пространство при помощи FUSE (Filesystem In Userspace). Сегодня мы настроим GlusterFS сервер и клиент в режиме RAID1 (каждый сервер будет содержать свою копию данных).
+
+Установим на каждый из двух серверов GlusterFS пакет glusterfs-server, который запускает на каждом сервере демон glusterd. Теперь нужно установить связь между двумя GlusterFS серверами, выполнив команду gluster peer probe:
+
+server0:~# gluster peer status
+Number of Peers: 0
+server0:~# gluster peer probe server1
+peer probe: success.
+server0~# gluster peer status
+Number of Peers: 1
+
+Hostname: server1
+Uuid: a9e3ee56-7d3f-428c-97e6-9238518ca9d8
+State: Peer in Cluster (Connected)
+
+server1:~# gluster peer status
+Number of Peers: 1
+
+Hostname: server0
+Uuid: fb07153b-e684-44d5-8c16-40f7066feb02
+State: Peer in Cluster (Connected)
+Выше мы установили соединение между двумя серверами. Фактически команда gluster peer probe регистрирует server1 как часть пула хранения данных. С помощью команды gluster peer status можно проверить, что сервера взаимодействуют друг с другом и готовы к созданию томов хранения. Если используется протокол ipv6, нужно включить опцию option transport.address-family inet6 в конфиге /etc/glusterfs/glusterd.vol.
+
+После настройки видимости двух серверов приступим к созданию тома хранения с репликацией. Это позволит хранить несколько экземпляров данных, которые будут доступны при выходе из строя одного из серверов. Для создания используется команда gluster volume create, имеющая следующий синтаксис для создания функционала реплики:
+
+gluster volume create volume_name replica count domain1.com:/path/to/data/directory domain2.com:/path/to/data/directory force
+Здесь:
+
+volume_name — имя тома;
+replica count — степень репликации;
+domain1.com:/path/to/data/directory domain2.com:/path/to/data/directory — расположение данных на серверах и ФС;
+force — позволяет создать том в корневом разделе. Рекомендуется использовать отдельные блочные девайсы, но в учебных целях мы пренебрежем этим ограничением.
+Помимо репликации GlusterFS поддерживает следующие типы томов: Distributed, Replicated, Distributed Replicated, Dispersed и Distributed Dispersed. В целом, эти типы томов можно сравнивать с режимами работы RAID, которые мы с вами уже рассматривали, а точнее — режимы RAID0, RAID1, RAID10, RAID5 и RAID50, соответственно. Более подробно можно прочитать в официальной документации.
+
+Ниже приведен пример создания и запуска тома со степенью репликации 2, в нем данные хранятся в директори /var/tmp/gluster-rebrainme. Запустить команду можно на любом из двух GlusterFS серверов:
+
+server0:~# gluster volume create rebrainme replica 2 server0:/var/tmp/gluster-rebrainme server1:/var/tmp/gluster-rebrainme force
+volume create: rebrainme: success: please start the volume to access data
+server0:~# gluster volume status
+Volume rebrainme is not started
+
+server0:~# gluster volume start rebrainme
+volume start: rebrainme: success
+server0:~# gluster volume status
+Status of volume: rebrainme
+Gluster process                             TCP Port  RDMA Port  Online  Pid
+------------------------------------------------------------------------------
+Brick server0:/var/tmp/gluster-rebrainme    49152     0          Y       981246
+Brick server1:/var/tmp/gluster-rebrainme    49152     0          Y       142132
+Self-heal Daemon on localhost               N/A       N/A        Y       981333
+Self-heal Daemon on lxd-srv01myt.mdst-w.yan
+dex.net                                     N/A       N/A        Y       142157
+
+Task Status of Volume rebrainme
+------------------------------------------------------------------------------
+There are no active volume tasks
+После настройки серверной части перейдем к настройке клиента. Как мы уже знаем, клиентский процесс соединяется с серверами по протоколам TCP/IP или InfiniBand и монтирует том с помощью FUSE или NFS (при этом вы потеряете часть производительности из-за остутствия некоторых возможностей нативного протокола, но если вам не хочется ставить дополнительные зависимости на сервере, то этот вариант может вам подойти):
+
+client~:# mount -t glusterfs server0:/rebrainme /mnt
+client~:# df -h /mnt
+Filesystem            Size  Used Avail Use% Mounted on
+server0:/rebrainme   37G   18G   18G  52% /mnt
+client~:#
+Создав файлы в директории /mnt на клиенте (например, for x in {0..4};do dd if=/dev/urandom of=/mnt/rebrainme_$x bs=1M count=$x;done), можно убедиться, что данные появились на обоих GlusterFS серверах (зеркалирование). Если один из серверов кластера хранения перестанет работать, он может выйти из синхронизации с пулом хранения при внесении каких-либо изменений в файловую систему. Операция чтения в точке монтирования на клиенте после возвращения сервера предупредит узел о необходимости получить недостающие файлы.
+
+Сегодня мы настроили распределенную систему хранения GlusterFS, обеспечивающую резервирование данных. Это может быть полезно для увеличения надежности хранения данных.
+
+Полезные ссылки:
+GlusterFS Documentation
+Quick Start Guide
+[UPD]Взрослеем с GlusterFS
