@@ -1,0 +1,280 @@
+Задание:
+Создайте локальный репозиторий без шифрования с ограничением стораджа 10M.
+Создайте директорию archive_dir c одним файлом zero размера 7M, состоящим из нулей.
+Создайте бэкап директории из предыдущего пункта со следующими параметрами:
+Компрессия lzma максимального уровня.
+Название бэкапа должно содержать имя пользователя и текущие дату и время.
+Добавьте в archive_dir файл rand со следующими параметрами:
+Размер - 10M.
+Должен состоять из рандомных данных.
+Еще раз запустите создание бэкапа из п.3.
+В качестве ответа пришлите команды и результат работы.
+
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+06.12.2022 09:32
+1. Создайте локальный репозиторий без шифрования с ограничением стораджа 10M.
+Установка
+wget https://github.com/borgbackup/borg/releases/download/1.2.2/borg-linux64 -O /usr/local/bin/borg
+chmod +x /usr/local/bin/borg
+
+useradd -s /bin/bash borg -p borg
+mkdir /home/borg
+chown -R borg:borg borg
+ssh-keygen -b 4096
+cp id_rsa ~/.ssh/
+cat id_rsa.pub > authorized_keys
+
+Создаем хранилище борг.
+borg init -e none --storage-quota 10M borg@localhost:RebrainmeRepo
+
+root@epdv7n6s2re5cm2egn84:~# echo $?
+0
+
+
+2. Создайте директорию archive_dir c одним файлом zero размера 7M, состоящим из нулей.
+mkdir /opt/archive_dir
+cd archive_dir
+
+root@epdv7n6s2re5cm2egn84:/opt/archive_dir# dd if=/dev/zero of=file_7M bs=1024 count=7
+7+0 records in
+7+0 records out
+7168 bytes (7.2 kB, 7.0 KiB) copied, 0.00024765 s, 28.9 MB/s
+
+root@epdv7n6s2re5cm2egn84:/opt/archive_dir# ll -h
+total 16K
+drwxr-xr-x 2 root root 4.0K Dec  6 06:07 ./
+drwxr-xr-x 3 root root 4.0K Dec  6 06:05 ../
+-rw-r--r-- 1 root root 7.0K Dec  6 06:07 file_7M
+
+3. Создайте бэкап директории из предыдущего пункта со следующими параметрами: 1) Компрессия lzma максимального уровня. 2) Название бэкапа должно содержать имя пользователя и текущие дату и время.
+# borg create --list --stats --compression lzma,9 borg@localhost:RebrainmeRepo::"$USER-{now:%Y-%m-%d_%H:%M:%S}" /opt/archive_dir
+
+root@epdv7n6s2re5cm2egn84:/opt# borg create --list --stats --compression lzma,9 borg@localhost:RebrainmeRepo::"$USER-{now:%Y-%m-%d_%H:%M:%S}" /opt/archive_dir
+A /opt/archive_dir/file_7M
+d /opt/archive_dir
+------------------------------------------------------------------------------
+Archive name: root-2022-12-06_06:22:33
+Archive fingerprint: 5cf79703b90ebb64e78dc3feb75f27d7c9daebf40f0ca35446bd64023cd6472e
+Time (start): Tue, 2022-12-06 06:22:37
+Time (end):   Tue, 2022-12-06 06:22:37
+Duration: 0.21 seconds
+Number of files: 1
+Utilization of max. archive size: 0%
+------------------------------------------------------------------------------
+                       Original size      Compressed size    Deduplicated size
+This archive:                8.00 kB                885 B                885 B
+All archives:                8.00 kB                885 B                885 B
+
+                       Unique chunks         Total chunks
+Chunk index:                       3                    3
+------------------------------------------------------------------------------
+
+root@epdv7n6s2re5cm2egn84:/opt# borg list borg@localhost:RebrainmeRepo
+root-2022-12-06_06:22:33             Tue, 2022-12-06 06:22:37 [5cf79703b90ebb64e78dc3feb75f27d7c9daebf40f0ca35446bd64023cd6472e]
+
+root@epdv7n6s2re5cm2egn84:/opt# borg list borg@localhost:RebrainmeRepo::root-2022-12-06_06:22:33
+drwxr-xr-x root   root          0 Tue, 2022-12-06 06:07:31 opt/archive_dir
+-rw-r--r-- root   root       7168 Tue, 2022-12-06 06:07:31 opt/archive_dir/file_7M
+4. Добавьте в archive_dir файл rand со следующими параметрами: 1) Размер - 10M. 2) Должен состоять из рандомных данных.
+root@epdv7n6s2re5cm2egn84:/opt/archive_dir# dd if=/dev/random of=rand bs=1024 count=10
+10+0 records in
+10+0 records out
+10240 bytes (10 kB, 10 KiB) copied, 0.000286058 s, 35.8 MB/s
+
+
+5. Еще раз запустите создание бэкапа из п.3.
+Так как я назвал его не правильно
+mv file_7M zero 
+
+root@epdv7n6s2re5cm2egn84:/opt/archive_dir# borg create --list --stats --compression lzma,9 borg@localhost:RebrainmeRepo::"$USER-{now:%Y-%m-%d_%H:%M:%S}" /opt/archive_dir
+A /opt/archive_dir/zero
+A /opt/archive_dir/rand
+d /opt/archive_dir
+------------------------------------------------------------------------------
+Archive name: root-2022-12-06_06:30:05
+Archive fingerprint: ee2c6a86609143fca309f8539e170eb6006224835a8353bf2daa4c1c94045fe6
+Time (start): Tue, 2022-12-06 06:30:09
+Time (end):   Tue, 2022-12-06 06:30:09
+Duration: 0.26 seconds
+Number of files: 2
+Utilization of max. archive size: 0%
+------------------------------------------------------------------------------
+                       Original size      Compressed size    Deduplicated size
+This archive:               18.42 kB             11.25 kB             11.15 kB
+All archives:               26.43 kB             12.13 kB             12.03 kB
+
+                       Unique chunks         Total chunks
+Chunk index:                       6                    7
+------------------------------------------------------------------------------
+
+root@epdv7n6s2re5cm2egn84:/opt/archive_dir#  borg list borg@localhost:RebrainmeRepo
+root-2022-12-06_06:22:33             Tue, 2022-12-06 06:22:37 [5cf79703b90ebb64e78dc3feb75f27d7c9daebf40f0ca35446bd64023cd6472e]
+root-2022-12-06_06:30:05             Tue, 2022-12-06 06:30:09 [ee2c6a86609143fca309f8539e170eb6006224835a8353bf2daa4c1c94045fe6]
+
+root@epdv7n6s2re5cm2egn84:/opt/archive_dir# borg list borg@localhost:RebrainmeRepo::root-2022-12-06_06:30:05
+drwxr-xr-x root   root          0 Tue, 2022-12-06 06:29:26 opt/archive_dir
+-rw-r--r-- root   root       7168 Tue, 2022-12-06 06:07:31 opt/archive_dir/zero
+-rw-r--r-- root   root      10240 Tue, 2022-12-06 06:28:39 opt/archive_dir/rand
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 4
+06.12.2022 23:56
+Максим, здравствуйте! Почти всё сделали правильно, но где-то закралась маленькая ошибка. Если всё сделали верно, второй бакап не должен был завершиться успешно ( кстати почему ? ).
+
+07.12.2022 08:11
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+07.12.2022 08:11
+Понял, я сделал 10кбайт. Спасибо.
+
+root@epdv7n6s2re5cm2egn84:/opt/archive_dir# dd if=/dev/random of=rand bs=1M count=10
+10+0 records in
+10+0 records out
+10485760 bytes (10 MB, 10 MiB) copied, 0.273155 s, 38.4 MB/s
+root@epdv7n6s2re5cm2egn84:/opt/archive_dir# dd if=/dev/zero of=zero bs=1M count=7
+7+0 records in
+7+0 records out
+7340032 bytes (7.3 MB, 7.0 MiB) copied, 0.0142411 s, 515 MB/s
+
+root@epdv7n6s2re5cm2egn84:/opt/archive_dir# ll -h
+total 18M
+drwxr-xr-x 2 root root 4.0K Dec  6 06:29 ./
+drwxr-xr-x 3 root root 4.0K Dec  6 06:05 ../
+-rw-r--r-- 1 root root  10M Dec  7 05:07 rand
+-rw-r--r-- 1 root root 7.0M Dec  7 05:07 zero
+
+root@epdv7n6s2re5cm2egn84:/opt/archive_dir# borg create --list --stats --compression lzma,9 borg@localhost:RebrainmeRepo::"$USER-{now:%Y-%m-%d_%H:%M:%S}" /opt/archive_dir
+A /opt/archive_dir/zero
+M /opt/archive_dir/rand
+d /opt/archive_dir
+The storage quota (10.00 MB) has been exceeded (10.50 MB). Try deleting some archives.
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 5
+07.12.2022 10:26
+Да, всё верно.
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+
+LNXA-11 03: Backups. borg
+Описание:
+Borg - утилита для резервного копирования, написанная на языке Python (с небольшими вставками на Cython и C для улучшения производительности). Ниже представлены некоторые основные особенности:
+
+Дедупликация для экономии дискового пространства. Файлы разбиваются на чанки, а в репозиторий добавляются только те чанки, которые ранее не использовались.
+Скорость. Код, который критичен для производительности, написан на C/Cython. К нему относятся такие операции, как сжатие, шифрование и разбитие на чанки.
+Сжатие. Все данные могут быть сжаты следующими алгоритмами шифрования: lz4, zstd, zlib, lzma.
+Хранение данных на любом удаленном хосте по SSH. Достаточно на удаленный хост установить Borg.
+Возможность установки на большинство современных платформ. Причем, как из PPA, так и в виде статического бинарника (достаточно с помощью curl скачать бинарник и пользоваться).
+Распространяется на условиях свободной лицензии BSD (3-clause).
+Содержит подробную документацию.
+Далее настроим простой бэкап на удаленный сервер. В нашем случае это будет localhost, но в production так делать все-таки не рекомендуется.
+
+Скачиваем бинарник по инструкции с официальной документации и выдаем права на исполнение:
+
+# sudo wget https://github.com/borgbackup/borg/releases/download/1.1.13/borg-linux64 -O /usr/local/bin/borg
+# sudo chmod +x /usr/local/bin/borg
+Создаем пользователя borg, прописываем ssh-ключ клиента в /home/borg/.ssh/authorized_keys (предварительно сгенерировав, если это нужно), выставляем нужные права, проверяем наличие доступа по ssh для пользователя borg.
+
+Инициализируем пустой borg репозиторий на удаленном сервере. В данном примере мы не будем использовать шифрование, но borg поддерживает несколько вариантов шифрования репозитория:
+
+# borg init -e none borg@localhost:RebrainMeRepo
+# echo $?
+0
+Подготовим несколько файлов для резервного копирования:
+
+# mkdir archive_dir; cd archive_dir
+# echo 1234 > borg1
+# echo 4321 > borg2
+Создадим наш первый бэкап. Аргумент --list позволяет увидеть список файлов, а аргумент --stats выводит статистику по бэкапу. С помощью FirstBackup-{now:%Y-%m-%d_%H:%M:%S} мы задали имя бэкапа внутри репозитория в подобном формате:
+
+borg create --list --stats borg@localhost:RebrainMeRepo::"FirstBackup-{now:%Y-%m-%d_%H:%M:%S}" archive_dir
+A archive_dir/borg1
+A archive_dir/borg2
+d archive_dir
+------------------------------------------------------------------------------
+Archive name: FirstBackup-2020-09-01_01:42:04
+Archive fingerprint: b7f070ed83c79d2b90d27011f75ad016f1cc6b37fafdfff230e3bb21558c77af
+Time (start): Tue, 2020-09-01 01:42:05
+Time (end):   Tue, 2020-09-01 01:42:05
+Duration: 0.00 seconds
+Number of files: 2
+Utilization of max. archive size: 0%
+------------------------------------------------------------------------------
+                       Original size      Compressed size    Deduplicated size
+This archive:                  998 B                785 B                785 B
+All archives:                  998 B                785 B                785 B
+
+                       Unique chunks         Total chunks
+Chunk index:                       4                    4
+------------------------------------------------------------------------------
+Смотрим, что же лежит в нашем сторадже и в бэкапе:
+
+# borg list borg@localhost:RebrainMeRepo
+FirstBackup-2020-09-01_01:42:04      Tue, 2020-09-01 01:42:05 [b7f070ed83c79d2b90d27011f75ad016f1cc6b37fafdfff230e3bb21558c77af]
+# borg list borg@localhost:RebrainMeRepo::FirstBackup-2020-09-01_01:42:04
+drwxr-xr-x kanst9 kanst9        0 Tue, 2020-09-01 01:39:34 archive_dir
+-rw-r--r-- kanst9 kanst9        5 Tue, 2020-09-01 01:39:27 archive_dir/borg1
+-rw-r--r-- kanst9 kanst9        5 Tue, 2020-09-01 01:39:34 archive_dir/borg2
+Первая команда вывела все бэкапы в borg репе, вторая - список файлов в бэкапе. FirstBackup-2020-09-01_01:42:04.
+
+Теперь скопируем файл borg1 в borg3 для проверки дефрагментации:
+
+# cp borg1 borg3
+# echo 4444  > borg4
+# borg create --list --stats borg@localhost:RebrainMeRepo::"SecondBackup" archive_dir
+U archive_dir/borg1
+A archive_dir/borg2
+A archive_dir/borg3
+A archive_dir/borg4
+d archive_dir
+------------------------------------------------------------------------------
+Archive name: SecondBackup
+Archive fingerprint: 318d1d74da17a456c07f23162199a23077f0468519d94b58aae6eff444855e9f
+Time (start): Tue, 2020-09-01 01:53:27
+Time (end):   Tue, 2020-09-01 01:53:27
+Duration: 0.00 seconds
+Number of files: 4
+Utilization of max. archive size: 0%
+------------------------------------------------------------------------------
+                       Original size      Compressed size    Deduplicated size
+This archive:                1.34 kB                850 B                823 B
+All archives:                2.33 kB              1.64 kB              1.61 kB
+
+                       Unique chunks         Total chunks
+Chunk index:                       7                   10
+------------------------------------------------------------------------------
+В результате выполнения бэкапа видно, что часть чанков была подвержена дедупликации, что позволяет лучше утилизировать дисковое пространство.
+
+В результате, мы получили два бэкапа директории archive_dir, причем второй - дополнение первого. Теперь попробуем удалить данные и восстановить их из бэкапа (иначе зачем делать бэкапы?)
+
+# rm archive_dir/borg4
+# ls archive_dir/     
+borg1  borg2  borg3
+# borg extract --list borg@localhost:RebrainMeRepo::SecondBackup archive_dir/borg4
+archive_dir/borg4
+ls archive_dir/
+borg1  borg2  borg3  borg4
+В примере выше мы специально удалили файл и восстановили его из бэкапа. Также borg позволяет восстановить и весь каталог, если не указать последний аргумент.
+
+В данном задании мы рассмотрели основы работы с утилитой для бэкапа borg. Более подробно изучить утилиту можно с помощью документации. Там вы найдете такие полезные вещи, как:
+
+автоматизация бэкапов;
+шифрование;
+настройка сжатия;
+etc.
+Полезные ссылки:
+Borg Documentation
+Borg Quick Start
