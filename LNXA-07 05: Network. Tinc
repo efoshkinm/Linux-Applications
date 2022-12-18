@@ -1,0 +1,335 @@
+Задание:
+Используя tinc, настроить виртуальную частную сеть между тремя хостами.
+Настроить такой вариант подключения, при котором перезагрузка одного хоста не влияет на работу остальной сети.
+Предоставить архив с тремя директориями. Внутри каждая из них содержит конфигурационный файл для хоста.
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+20.10.2022 06:50
+1. Установка
+address: 84.201.142.111 - host1
+address: 51.250.104.232 - host2
+address: 158.160.10.252 - host3
+
+
+2. Настройка host1
+host1
+# Установка
+dnf install tinc
+
+# Создаем папку в  /etc и переносим конфиг туда.
+find / -name tinc
+cd /usr/share/doc/tinc/sample-config/hosts
+mkdir -p /etc/tinc/rebrain
+cp -r * /etc/tinc/rebrain
+cd /etc/tinc/rebrain/
+
+[root@epdo2fcbll067bun2eg4 rebrain]# cat tinc.conf | grep -v -e '#'
+Name = host1
+ConnectTo = host2
+ConnectTo = host3
+Device = /dev/net/tun
+
+# Создаем интерфейс, даем айпи адрес и добавляем маршруты
+[root@epdo2fcbll067bun2eg4 rebrain]# cat tinc-up | grep -v -e '#'
+ip link set $INTERFACE up
+ip addr add 192.168.1.1/24 dev $INTERFACE
+ip route add 192.168.2.0/24 via 192.168.1.1
+ip route add 192.168.3.0/24 via 192.168.1.1
+[root@epdo2fcbll067bun2eg4 rebrain]# cat tinc-down | grep -v -e '#'
+ip link set $INTERFACE down
+ip addr del 192.168.1.1/24 dev $INTERFACE
+
+cd /etc/tinc/rebrain/hosts
+[root@epdo2fcbll067bun2eg4 rebrain]# cat hosts/host* | grep -v '^#'
+
+# Генереируем ключи хоста
+tincd -n rebrain -K
+
+cd /etc/tinc/rebrain/hosts
+[root@epdo2fcbll067bun2eg4 rebrain]# cat hosts/host* | grep -v '^#'
+#host1
+Address = 84.201.142.111
+Port = 655
+Subnet = 192.168.1.0/24
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEAwvd9gRRo/5/+6v7Nx4EnjspA6SaVp+6cYoq9jdiSwTYj5qJp8JUb
+CYa4wCK5tEFRs+PP32L4sU4CC15NfWzvGZ5HUoOzKl9DyF3j6BhnJlsgtzX84v+e
+cLJSU0qQd1+cWzYytSeyg9d9yZBEc4JZOB/JB5VUXtlZC9rdu69aeahX1KLb/Pb7
+ErbdewcIa/OKSmzrPImhzTj8vTOAHT6+YZuzAxk3peUbhQpB5+72u6f2bwptTBFg
+Au3ERuJ9LLKGHYCeshYDovb4trFsBFgMtlRuxE0qd1nWNJRttS5Rd0SdpuTxAYKx
+w8UzZ/asePTPrOx5TyDUR2V7z8VquNt6aQIDAQAB
+-----END RSA PUBLIC KEY-----
+
+# host2
+Address = 51.250.104.232
+Port = 655
+Subnet = 192.168.2.0/24
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEAubK5u3jKWIM82ybbN7rZHL7dKnU2nc2ojiS/SsJ0bwyjcW6QOeDI
+9gYF5oKC6KFIp0f9abROKPrtnA2R6pYNG/DZB/Z3qsYEDYpG9HVCjf6rqy2Q5nwp
+IMCZt+j4oWXF4XxfFmpQRY+gloqsgq8jMS/JiMqUhCYbIYLkXEy0GBDHp/698+HR
+9PrxmZ5m9mw6tNnQu0u5aqgesRjkGgss3IQrfUWPANlXw5Kg+pZn2Bg9wL9YWBDo
+sbLyn+yH8cv3E3j8AIBIXxYoXrx7eGVswE+ODH+0Rp/oCG3WE46CPC8dBv9QF5+t
+xwdOg5TOvG9rNV9KDv3S2LPhXZ/+4GrS1QIDAQAB
+-----END RSA PUBLIC KEY-----
+
+
+
+# host3
+Address = 158.160.10.252
+Port = 655
+Subnet = 192.168.3.0/24
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEAva9+AxbLH9Ug6apUbZLkElPbXPDg0VmKe7mmUNBnPQUVnRiJ/wqI
+mpI5jUsS9H9J/E9iutk7gxOa8hZoVWGQlc3XyQgu+Iek6dMLPB1Fw76SAZ5yePQj
+lHS/FFoKeyOi7UBdTn0fSc4rSDVzFy3SQvpy6YRAFETLbHQ6NFtMq1aca0o+yj7b
+sFl4ui83oQzTXjNRl1kWl1podKi2fYDStGRnZsuV0FRssAm9C6OU9zmjRBcSCNzX
+QR3/RxjAKOfmNqhbkSONBZpZ6XKsOTxeYip8aX6nFB8GbY6xLDDTbeU72UUmNn5c
+04h6j9LnhXpJWovVN9oAufdc6CZlBIjzXwIDAQAB
+-----END RSA PUBLIC KEY-----
+2. Настройка host2
+host2
+# Установка
+dnf install tinc
+
+# Создаем папку в  /etc и переносим конфиг туда.
+find / -name tinc
+cd /usr/share/doc/tinc/sample-config/hosts
+mkdir -p /etc/tinc/rebrain
+cp -r * /etc/tinc/rebrain
+cd /etc/tinc/rebrain/
+
+[root@epdo2fcbll067bun2eg4 rebrain]# cat tinc.conf | grep -v -e '#'
+Name = host2
+ConnectTo = host1
+ConnectTo = host3
+Device = /dev/net/tun
+
+# Создаем интерфейс, даем айпи адрес и добавляем маршруты
+[root@epdo2fcbll067bun2eg4 rebrain]# cat tinc-up | grep -v -e '#'
+ip link set $INTERFACE up
+ip addr add 192.168.2.1/24 dev $INTERFACE
+ip route add 192.168.1.0/24 via 192.168.2.1
+ip route add 192.168.3.0/24 via 192.168.2.1
+[root@epdo2fcbll067bun2eg4 rebrain]# cat tinc-down | grep -v -e '#'
+ip link set $INTERFACE down
+ip addr del 192.168.2.1/24 dev $INTERFACE
+
+cd /etc/tinc/rebrain/hosts
+[root@epdo2fcbll067bun2eg4 rebrain]# cat hosts/host* | grep -v '^#'
+
+# Генереируем ключи хоста
+tincd -n rebrain -K
+
+cd /etc/tinc/rebrain/hosts
+[root@epdo2fcbll067bun2eg4 rebrain]# cat hosts/host* | grep -v '^#'
+#host1
+Address = 84.201.142.111
+Port = 655
+Subnet = 192.168.1.0/24
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEAwvd9gRRo/5/+6v7Nx4EnjspA6SaVp+6cYoq9jdiSwTYj5qJp8JUb
+CYa4wCK5tEFRs+PP32L4sU4CC15NfWzvGZ5HUoOzKl9DyF3j6BhnJlsgtzX84v+e
+cLJSU0qQd1+cWzYytSeyg9d9yZBEc4JZOB/JB5VUXtlZC9rdu69aeahX1KLb/Pb7
+ErbdewcIa/OKSmzrPImhzTj8vTOAHT6+YZuzAxk3peUbhQpB5+72u6f2bwptTBFg
+Au3ERuJ9LLKGHYCeshYDovb4trFsBFgMtlRuxE0qd1nWNJRttS5Rd0SdpuTxAYKx
+w8UzZ/asePTPrOx5TyDUR2V7z8VquNt6aQIDAQAB
+-----END RSA PUBLIC KEY-----
+
+# host2
+Address = 51.250.104.232
+Port = 655
+Subnet = 192.168.2.0/24
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEAubK5u3jKWIM82ybbN7rZHL7dKnU2nc2ojiS/SsJ0bwyjcW6QOeDI
+9gYF5oKC6KFIp0f9abROKPrtnA2R6pYNG/DZB/Z3qsYEDYpG9HVCjf6rqy2Q5nwp
+IMCZt+j4oWXF4XxfFmpQRY+gloqsgq8jMS/JiMqUhCYbIYLkXEy0GBDHp/698+HR
+9PrxmZ5m9mw6tNnQu0u5aqgesRjkGgss3IQrfUWPANlXw5Kg+pZn2Bg9wL9YWBDo
+sbLyn+yH8cv3E3j8AIBIXxYoXrx7eGVswE+ODH+0Rp/oCG3WE46CPC8dBv9QF5+t
+xwdOg5TOvG9rNV9KDv3S2LPhXZ/+4GrS1QIDAQAB
+-----END RSA PUBLIC KEY-----
+
+
+
+# host3
+Address = 158.160.10.252
+Port = 655
+Subnet = 192.168.3.0/24
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEAva9+AxbLH9Ug6apUbZLkElPbXPDg0VmKe7mmUNBnPQUVnRiJ/wqI
+mpI5jUsS9H9J/E9iutk7gxOa8hZoVWGQlc3XyQgu+Iek6dMLPB1Fw76SAZ5yePQj
+lHS/FFoKeyOi7UBdTn0fSc4rSDVzFy3SQvpy6YRAFETLbHQ6NFtMq1aca0o+yj7b
+sFl4ui83oQzTXjNRl1kWl1podKi2fYDStGRnZsuV0FRssAm9C6OU9zmjRBcSCNzX
+QR3/RxjAKOfmNqhbkSONBZpZ6XKsOTxeYip8aX6nFB8GbY6xLDDTbeU72UUmNn5c
+04h6j9LnhXpJWovVN9oAufdc6CZlBIjzXwIDAQAB
+-----END RSA PUBLIC KEY-----
+2. Настройка host3
+host3
+# Установка
+dnf install tinc
+
+# Создаем папку в  /etc и переносим конфиг туда.
+find / -name tinc
+cd /usr/share/doc/tinc/sample-config/hosts
+mkdir -p /etc/tinc/rebrain
+cp -r * /etc/tinc/rebrain
+cd /etc/tinc/rebrain/
+
+[root@epdo2fcbll067bun2eg4 rebrain]# cat tinc.conf | grep -v -e '#'
+Name = host2
+ConnectTo = host1
+ConnectTo = host2
+Device = /dev/net/tun
+
+# Создаем интерфейс, даем айпи адрес и добавляем маршруты
+[root@epdo2fcbll067bun2eg4 rebrain]# cat tinc-up | grep -v -e '#'
+ip link set $INTERFACE up
+ip addr add 192.168.3.1/24 dev $INTERFACE
+ip route add 192.168.1.0/24 via 192.168.3.1
+ip route add 192.168.2.0/24 via 192.168.3.1
+[root@epdo2fcbll067bun2eg4 rebrain]# cat tinc-down | grep -v -e '#'
+ip link set $INTERFACE down
+ip addr del 192.168.3.1/24 dev $INTERFACE
+
+cd /etc/tinc/rebrain/hosts
+[root@epdo2fcbll067bun2eg4 rebrain]# cat hosts/host* | grep -v '^#'
+
+# Генереируем ключи хоста
+tincd -n rebrain -K
+
+cd /etc/tinc/rebrain/hosts
+[root@epdo2fcbll067bun2eg4 rebrain]# cat hosts/host* | grep -v '^#'
+#host1
+Address = 84.201.142.111
+Port = 655
+Subnet = 192.168.1.0/24
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEAwvd9gRRo/5/+6v7Nx4EnjspA6SaVp+6cYoq9jdiSwTYj5qJp8JUb
+CYa4wCK5tEFRs+PP32L4sU4CC15NfWzvGZ5HUoOzKl9DyF3j6BhnJlsgtzX84v+e
+cLJSU0qQd1+cWzYytSeyg9d9yZBEc4JZOB/JB5VUXtlZC9rdu69aeahX1KLb/Pb7
+ErbdewcIa/OKSmzrPImhzTj8vTOAHT6+YZuzAxk3peUbhQpB5+72u6f2bwptTBFg
+Au3ERuJ9LLKGHYCeshYDovb4trFsBFgMtlRuxE0qd1nWNJRttS5Rd0SdpuTxAYKx
+w8UzZ/asePTPrOx5TyDUR2V7z8VquNt6aQIDAQAB
+-----END RSA PUBLIC KEY-----
+
+# host2
+Address = 51.250.104.232
+Port = 655
+Subnet = 192.168.2.0/24
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEAubK5u3jKWIM82ybbN7rZHL7dKnU2nc2ojiS/SsJ0bwyjcW6QOeDI
+9gYF5oKC6KFIp0f9abROKPrtnA2R6pYNG/DZB/Z3qsYEDYpG9HVCjf6rqy2Q5nwp
+IMCZt+j4oWXF4XxfFmpQRY+gloqsgq8jMS/JiMqUhCYbIYLkXEy0GBDHp/698+HR
+9PrxmZ5m9mw6tNnQu0u5aqgesRjkGgss3IQrfUWPANlXw5Kg+pZn2Bg9wL9YWBDo
+sbLyn+yH8cv3E3j8AIBIXxYoXrx7eGVswE+ODH+0Rp/oCG3WE46CPC8dBv9QF5+t
+xwdOg5TOvG9rNV9KDv3S2LPhXZ/+4GrS1QIDAQAB
+-----END RSA PUBLIC KEY-----
+
+
+
+# host3
+Address = 158.160.10.252
+Port = 655
+Subnet = 192.168.3.0/24
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEAva9+AxbLH9Ug6apUbZLkElPbXPDg0VmKe7mmUNBnPQUVnRiJ/wqI
+mpI5jUsS9H9J/E9iutk7gxOa8hZoVWGQlc3XyQgu+Iek6dMLPB1Fw76SAZ5yePQj
+lHS/FFoKeyOi7UBdTn0fSc4rSDVzFy3SQvpy6YRAFETLbHQ6NFtMq1aca0o+yj7b
+sFl4ui83oQzTXjNRl1kWl1podKi2fYDStGRnZsuV0FRssAm9C6OU9zmjRBcSCNzX
+QR3/RxjAKOfmNqhbkSONBZpZ6XKsOTxeYip8aX6nFB8GbY6xLDDTbeU72UUmNn5c
+04h6j9LnhXpJWovVN9oAufdc6CZlBIjzXwIDAQAB
+-----END RSA PUBLIC KEY-----
+3. Настройка службы
+systemctl enable --now tinc@rebrain
+
+# Пробовал с ребутами, связь есть между хостами.
+
+4. Архив с конфигами
+https://disk.yandex.ru/d/WF2e1UXFE_pd1g
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+20.10.2022 10:12
+Добрый день!
+
+Отличные знание темы и выполнение задания, замечаний и вопросов нет!
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+
+LNXA-07 05: Network. Tinc
+Описание:
+Продолжим тему сервисов для построения виртуальных частных сетей и на очереди у нас — Tinc.
+
+Tinc — это демон виртуальной частной сети с открытым исходным кодом и полезными функциями, такими как шифрование, сжатие и автоматическая маршрутизация сегментов, которые могут произвольно маршрутизировать трафик VPN напрямую между серверами (mesh routing). Еще можно выделить следующие функции:
+
+Шифрование, аутентификация и сжатие — весь трафик дополнительно сжимается с использованием zlib или LZO, а LibreSSL или OpenSSL используются для шифрования трафика и защиты его от изменения.
+Автоматическая маршрутизация (full mesh routing) — независимо от того, как вы настроили демоны Tinc для соединения друг с другом, VPN-трафик всегда (если это возможно) отправляется напрямую к месту назначения, без прохождения промежуточных узлов.
+Простое расширение — если нам необходимо добавить узлы в VPN-сеть, то задача просто сводится к добавлению дополнительного файла конфигурации и нет необходимости запускать новые демоны или создавать и настраивать новые устройства или сетевые интерфейсы.
+Возможность объединения сегментов сетей (bridge) — то есть, можно связать несколько подразделений в единую локальную сеть.
+В качестве примера мы рассмотрим простейший случай - связывание двух узлов в единую сеть через интернет. Предположим, что мы объединяем сервер базы данных (db) и сервер приложения (app).
+
+На каждом узле создадим директорию /etc/tinc/vpn0 (где vpn0 является названием сети) и на сервер db добавим конфигурационный файл вида:
+
+Name = db
+Device = /dev/net/tun
+AddressFamily = ipv4
+Где Name является уникальным идентификатором, Device определяет, какое устройство будет использоваться, AddressFamily — указывает на тип адресации.
+
+На сервер app мы добавим похожую конфигурацию с одним дополнительным параметром:
+
+Name = app
+Device = /dev/net/tun
+AddressFamily = ipv4
+ConnectTo = db
+В данном случае параметр ConnectTo указывает на сервер, к которому мы будем подключаться. Если параметр опущен, то демон переходит в режим прослушивания и сам подключения не инициирует.
+
+Теперь создадим файл конфигурации хостов, по сути, это описание того, где находится каждый сервер, на каждой машине создаем файл ее описания.
+
+Для описания app сервера создаем файл /etc/tinc/vpn0/hosts/app следующего содержания:
+
+Address = 95.217.177.241
+Subnet = 192.168.1.101
+Где Address — это внешний адрес сервера, Subnet — внутренний. И сразу генерируем пару ключей:
+
+tincd -n vpn0 -K4096
+Теперь у нас будет файл описания хоста примерно с таким содержимым:
+
+Address = 95.217.177.241
+Subnet = 192.168.1.101
+
+-----BEGIN RSA PUBLIC KEY-----
+...
+-----END RSA PUBLIC KEY-----
+На сервере db повторяем процедуру с указанием его адресации в виде файла /etc/tinc/vpn0/hosts/db:
+
+Address = 95.216.166.154
+Subnet = 192.168.1.102
+И также генерируем ключи командой tincd -n vpn0 -K4096. Теперь любым доступным способом обмениваемся файлами описания хостов между машинами, то есть, в результате на всех машинах в /etc/tinc/vpn0 должны находиться файлы описания всех хостов с их публичными ключами.
+
+Дело за малым, осталось на каждом хосте создать файлы включения и выключения интерфейсов с учетом адресации, то есть, для app это будут два файла, файл /etc/tinc/vpn0/tinc-down вида:
+
+#!/bin/sh
+ip addr del 192.168.1.101/24 dev $INTERFACE
+ip link set $INTERFACE down
+И файл /etc/tinc/vpn0/tinc-up вида:
+
+#!/bin/sh
+ip link set $INTERFACE up
+ip addr add  192.168.1.101/24 dev $INTERFACE
+Для остальных хостов, в нашем случае это db, все прописывается аналогично. В итоге, запустив на каждом хосте демон командой tincd -n vpn0 -D -d3, мы получим виртуальную частную сеть между машинами.
+
+Полезные ссылки:
+Welcome to tinc!
+Tinc
+tinc-boot — full-mesh сеть без боли
