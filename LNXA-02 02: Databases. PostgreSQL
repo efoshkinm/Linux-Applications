@@ -1,0 +1,243 @@
+Задание:
+Задание рекомендуется выполнять на чистой VM.
+Произведите установку postgresql 12.2 и произведите подключение к БД под пользователем postgres.
+Создайте базу rebrain и пользователя student с паролем pass, обладающего всеми правами на указанную базу. Приведите используемые команды в качестве ответа.
+Создайте новую последовательность task_id и таблицу tasks (в базе rebrain), в которой поле id будет целочисленным значением, постоянно увеличивающимся на 1 при создании новой записи. Также создайте поле name, которое будет содержать символьные данные длиной до 64 символов.
+Запишите в таблицу tasks 2 записи, определяя только поле name ('first_task', 'second_task'). После получите все данные из указанной таблицы, команды и вывод предоставьте.
+Введите указанную команду:
+SELECT user, pid, client_addr, query, query_start, NOW() - query_start AS elapsed
+FROM pg_stat_activity
+WHERE query != '<IDLE>'
+ORDER BY elapsed DESC;
+
+Постарайтесь разобраться в ее назначении. Модифицируйте ее таким способом, чтобы помимо указанных условий вам выводились лишь строки, в которых есть запись в `client_addr`. В ответ предоставьте полную версию получившейся команды.
+
+
+**************************************************************
+Решение
+**************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+21.07.2022 08:48
+1. Задание рекомендуется выполнять на чистой VM.
+[m.efoshkin@MiWiFi-R4A-srv lnxa]$ yc compute instance create     --name efoshkin-lnxa-02-02     --network-interface subnet-name=default-ru-central1-b,nat-ip-version=ipv4     --zone ru-central1-b     --ssh-key ~/.ssh/id_rsa.pub     --cores 2     --core-fraction 5   --create-boot-disk image-folder-id=standard-images,image-family=ubuntu-2004-lts     --labels user_email=maxefoshkin@gmail.com,task_name=lnxa-02-02
+done (22s)
+id: epd1slch69ubd5n16763
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-07-19T05:38:10Z"
+name: efoshkin-lnxa-02-02
+labels:
+  task_name: lnxa-02-02
+  user_email: maxefoshkin@gmail.com
+zone_id: ru-central1-b
+platform_id: standard-v2
+resources:
+  memory: "2147483648"
+  cores: "2"
+  core_fraction: "5"
+status: RUNNING
+boot_disk:
+  mode: READ_WRITE
+  device_name: epd0ehpm3kqei641cste
+  auto_delete: true
+  disk_id: epd0ehpm3kqei641cste
+network_interfaces:
+- index: "0"
+  mac_address: d0:0d:1e:55:91:32
+  subnet_id: e2lebfr9cjkjg4ruk3gn
+  primary_v4_address:
+    address: 10.129.0.37
+    one_to_one_nat:
+      address: 51.250.23.231
+      ip_version: IPV4
+fqdn: epd1slch69ubd5n16763.auto.internal
+scheduling_policy: {}
+network_settings:
+  type: STANDARD
+placement_policy: {}
+
+
+2. Произведите установку postgresql 12.2 и произведите подключение к БД под пользователем postgres.
+sudo apt update
+sudo apt -y install vim bash-completion wget
+
+#Add PostgreSQL 12 repository
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" |sudo tee  /etc/apt/sources.list.d/pgdg.list
+
+#Установка
+sudo apt update
+sudo apt -y install postgresql-12 postgresql-client-12
+
+#Проверка
+systemctl status postgresql.service 
+
+3. Создайте базу rebrain и пользователя student с паролем pass, обладающего всеми правами на указанную базу. Приведите используемые команды в качестве ответа.
+#нужно быть под пользователем постгрес
+su postgres
+createdb rebrain
+
+psql -U postgres
+CREATE ROLE student WITH LOGIN PASSWORD 'pass';
+
+#Проверка
+SELECT rolname FROM pg_roles;
+CREATE ROLE
+          rolname          
+---------------------------
+ postgres
+ pg_monitor
+ pg_read_all_settings
+ pg_read_all_stats
+ pg_stat_scan_tables
+ pg_read_server_files
+ pg_write_server_files
+ pg_execute_server_program
+ pg_signal_backend
+ student
+(10 rows)
+
+postgres=# 
+
+GRANT ALL PRIVILEGES ON DATABASE rebrain TO student;
+
+postgres=# \l
+                                  List of databases
+   Name    |  Owner   | Encoding |   Collate   |    Ctype    |   Access privileges   
+-----------+----------+----------+-------------+-------------+-----------------------
+ postgres  | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 | 
+ rebrain   | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 | =Tc/postgres         +
+           |          |          |             |             | postgres=CTc/postgres+
+           |          |          |             |             | student=CTc/postgres
+ template0 | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 | =c/postgres          +
+           |          |          |             |             | postgres=CTc/postgres
+ template1 | postgres | UTF8     | en_US.UTF-8 | en_US.UTF-8 | =c/postgres          +
+           |          |          |             |             | postgres=CTc/postgres
+(4 rows)
+
+postgres=# 
+
+4. Создайте новую последовательность task_id и таблицу tasks (в базе rebrain), в которой поле id будет целочисленным значением, постоянно увеличивающимся на 1 при создании новой записи. Также создайте поле name, которое будет содержать символьные данные длиной до 64 символов.
+CREATE SEQUENCE task_id INCREMENT 1;
+CREATE TABLE tasks ( id   serial  PRIMARY KEY, name  varchar(64) );
+ 
+ 
+5. Запишите в таблицу tasks 2 записи, определяя только поле name ('first_task', 'second_task'). После получите все данные из указанной таблицы, команды и вывод предоставьте.
+rebrain=# INSERT INTO tasks (name) VALUES ('first_task');
+INSERT 0 1
+rebrain=# INSERT INTO tasks (name) VALUES ('second_task');
+INSERT 0 1
+
+rebrain=# select * from tasks;
+ id |    name     
+----+-------------
+  1 | first_task
+  2 | second_task
+(2 rows)
+
+rebrain=# 
+ 
+ 
+6. Введите указанную команду:
+ rebrain=# select * from pg_stat_activity;
+rebrain=# SELECT user, pid, client_addr, query, query_start, NOW() - query_start AS elapsed
+rebrain-# FROM pg_stat_activity
+rebrain-# WHERE query != '<IDLE>'
+rebrain-# ORDER BY elapsed DESC;
+   user   |  pid  | client_addr |                                       query                                       |          query_start          | elapsed  
+----------+-------+-------------+-----------------------------------------------------------------------------------+-------------------------------+----------
+ postgres |  6707 |             |                                                                                   |                               | 
+ postgres |  6709 |             |                                                                                   |                               | 
+ postgres |  6705 |             |                                                                                   |                               | 
+ postgres |  6704 |             |                                                                                   |                               | 
+ postgres |  6706 |             |                                                                                   |                               | 
+ postgres | 15503 |             | SELECT user, pid, client_addr, query, query_start, NOW() - query_start AS elapsed+| 2022-07-21 05:31:14.446464+00 | 00:00:00
+          |       |             | FROM pg_stat_activity                                                            +|                               | 
+          |       |             | WHERE query != '<IDLE>'                                                          +|                               | 
+          |       |             | ORDER BY elapsed DESC;                                                            |                               | 
+(6 rows)
+
+rebrain=# 
+
+
+На самом деле как видно в таблице нет записей толком. client_addr пустой
+
+rebrain=# SELECT user, pid, client_addr, query, query_start, NOW() - query_start AS elapsed
+FROM pg_stat_activity
+WHERE client_addr != NULL 
+ORDER BY elapsed DESC;
+ user | pid | client_addr | query | query_start | elapsed 
+------+-----+-------------+-------+-------------+---------
+(0 rows)
+
+rebrain=# 
+
+ Если убрать NOW() тоже самое
+rebrain=# SELECT user, pid, client_addr, query, query_start                                
+FROM pg_stat_activity
+WHERE client_addr != NULL ;
+ user | pid | client_addr | query | query_start 
+------+-----+-------------+-------+-------------
+(0 rows)
+
+rebrain=# 
+ 
+ 
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 4
+21.07.2022 08:53
+Добрый день!
+
+"На самом деле как видно в таблице нет записей толком. client_addr пустой" - ОК.
+
+п.6. "чтобы помимо указанных условий вам выводились лишь строки, в которых есть запись в client_addr" - нужно два условия с логическим оператором, т.е. к существующему добавить еще одно.
+21.07.2022 09:25
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+21.07.2022 09:25
+Я подключился под пользователем student
+
+psql -h 127.0.0.1 -U student rebrain
+SELECT user, pid, client_addr, query, query_start, NOW() - query_start AS elapsed
+FROM pg_stat_activity
+WHERE query != '<IDLE>' AND client_addr IS NOT NULL
+ORDER BY elapsed DESC;
+
+  user   |  pid  | client_addr |                                       query                                       |          query_start          | elapsed  
+---------+-------+-------------+-----------------------------------------------------------------------------------+-------------------------------+----------
+ student | 16374 | 127.0.0.1   | SELECT user, pid, client_addr, query, query_start, NOW() - query_start AS elapsed+| 2022-07-21 06:24:51.029122+00 | 00:00:00
+         |       |             | FROM pg_stat_activity                                                            +|                               | 
+         |       |             | WHERE query != '<IDLE>' AND client_addr IS NOT NULL                              +|                               | 
+         |       |             | ORDER BY elapsed DESC;                                                            |                               | 
+(1 row)
+
+rebrain=> 
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+21.07.2022 09:32
+Добрый день!
+
+WHERE query != '<IDLE>' AND client_addr IS NOT NULL
+Отличные знание темы и выполнение задания, замечаний и вопросов нет!
+
+
+*********************************************************************************
+Теория
+*********************************************************************************
+
+LNXA-02 02: Databases. PostgreSQL
+Описание:
+PostgreSQL является крайне популярной объектно-реляционной БД. Строго говоря, БД Postgres была разработана до MySQL, но SQL-синтаксис тогда еще не поддерживала, он появился только в postgres95, а нынешнее имя она получила еще позже. Несмотря на то, что MySQL была черезвычайно популярна в 2000-х, на текущий момент ситуация очень сильно изменилась, и данная БД стала крайне распространенной, в основном из-за высокой степени надежности, соответствия пресловутым требованиям ACID, вариативной и надежной репликации, фишкам вроде наследования и возможности настроить партиционирование и так далее.
+
+Одной из особенностей PostgreSQL является WAL - whrite-ahead log. При выполнении каких-либо действий БД записывает изменения в определенный файл, для того чтобы обеспечить надежность сохранения данных и гарантию выполнения тразакций (мы ведь уже прочитали, что такое транзакции, верно?). Если вы проявили инициативу и подробно ознакомились с MySQL при выполнении предыдущего задания, то должны быть знакомы с binary log или же с принципами SBR/RBR (state/rows-based replication). Однако в случае с MySQL все несколько сложнее, и этими штуками занимается именно обертка, на логическом уровне приложения, а вот WAL в postgreSQL пишется именно на физическом уровне, там, где хранятся сами данные, что в действительности является огромным преимуществом указанной БД.
+
+При выполнении предыдущего задания вы могли удивиться тому, что мы достаточно плотно поработали с БД, познакомились с особенностями ее конфигурации, но не ознакомились с SQL-синтаксисом, это ведь основа всего! Что же, и правда, давайте исправлять эту досадную оплошность.
+
+Полезные ссылки:
+PostgreSQL Docs
+Любимая тема холиваров MySQL vs PostgreSQL
+
