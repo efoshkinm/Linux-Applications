@@ -1,0 +1,185 @@
+Задание:
+Создайте VM (в облаке или локально) с серверным дистрибутивом. Рекомендуем не менее 2 GB RAM.
+Установите VNC-server и Desktop environment на созданную VM. Команды установки и результат выполнения приложите к ответу. Полный лог установки прикладывать не надо.
+Установите VNC-client на ваш локальный ПК.
+Произведите подключение к Linux Server по SSH с помощью VNC. Выполненную команду приложите к ответу.
+После выполнения соединения сделайте скриншот рабочего стола вашего ПК с организованным удаленным доступом. Скриншот приложите к ответу.
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+05.12.2022 11:13
+1. Установка
+address: 158.160.14.4
+root@epd05en9qmtot3jk6vda:/home/yc-user# free -h
+                     total        used        free      shared  buff/cache   available
+Mem:          3.8Gi       143Mi       3.4Gi       0.0Ki       259Mi       3.5Gi
+Swap:            0B          0B          0B
+
+2. Установите VNC-server и Desktop environment на созданную VM. Команды установки и результат выполнения приложите к ответу. Полный лог установки прикладывать не надо.
+Я решил все затереть что писал. Если коротко то с tighvnc я наплакался. 
+Перешел на TigerVNC, как я понял синтаксически это 1 в 1 tightvnc, и на нем у меня завелся. 
+
+Сразу приведу рабочий вариант. Сразу скажу было много попаток понять что к чему. Я в принципе не понимал где смотреть команду запуска окуржений, но к счастью на одном из форумов по TigerVNC я нашел ответ на свой вопрос. 
+смотреть нужно в 
+cd  /usr/share/xsessions
+root@epdv7n6s2re5cm2egn84:/usr/share/xsessions# ll
+total 32
+drwxr-xr-x   2 root root  4096 Dec  5 04:59 ./
+drwxr-xr-x 268 root root 12288 Dec  5 06:13 ../
+lrwxrwxrwx   1 root root    18 Mar 26  2020 gnome.desktop -> gnome-xorg.desktop
+-rw-r--r--   1 root root   257 Mar 26  2020 gnome-xorg.desktop
+-rw-r--r--   1 root root   303 Mar 26  2020 ubuntu.desktop
+-rw-r--r--   1 root root  6273 Mar 30  2020 xfce.desktop
+
+И нужно делать cat xfce.desktop к примеру и грепнуть по Exec
+root@epdv7n6s2re5cm2egn84:/usr/share/xsessions# cat xfce.desktop | grep Exec
+Exec=startxfce4
+
+Таким образом он покажет, что нужно забивать в файл xstartup. 
+К примеру на Gnome Environment эта строка была намного длиннее.
+root@epdv7n6s2re5cm2egn84:/usr/share/xsessions# cat gnome.desktop | grep Exec
+Exec=/usr/bin/gnome-session --session=gnome
+
+Проверил оба варианта, оба работают. 
+
+Так же пока разибрался я изучил по подробнее что такое SSH - тунель. И в итоге смог через него пробросить VNC. 
+
+Я сделал два проброса, один на локальную машину с Gnome Environment и вторая на удаленную машину с XFCE Environment. 
+[m.efoshkin@fedora ~]$  ssh  -L 5901:127.0.0.1:5901 -N -f -l max 192.168.150.39
+max@192.168.150.39's password: 
+[m.efoshkin@fedora ~]$  ssh  -L 5911:127.0.0.1:5901 -N -f -l epdv7n6s2re5cm2egn84 yc-user@158.160.14.4
+epdv7n6s2re5cm2egn84@158.160.14.4: Permission denied (publickey).
+[m.efoshkin@fedora ~]$  ssh  -L 5911:127.0.0.1:5901 -N -f -l  yc-user 158.160.14.4
+
+
+Что ж, приступим к установке сервера
+Установка  TigerVNC
+sudo apt install tigervnc-standalone-server tigervnc-common tigervnc-xorg-extension tigervnc-viewer
+
+sudo apt install ubuntu-gnome-desktop
+и на удаленный сервер
+sudo apt-get install xubuntu-desktop
+
+Дальше запускаем сервер один раз для задания пароля.
+vncserver
+пароль rebrainme
+
+дальше стопаем сервер
+vncserver -kill :1
+
+Дальше Создаем файл xstatup
+vi ~/.vnc/xstartup
+
+И тут это то что я понял на формуе, потомучто везде разная информация и никто только не объясняет что должно быть в этом файле, но вот
+#!/bin/bash
+PATH=/usr/bin:/usr/sbin
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+exec ЗАПУСК &
+
+Вместо запуска, то что мы нашли в  Exec в /usr/share/xsessions/*.desktop | grep Exec
+
+Получилось
+Для локального сервера
+#!/bin/bash
+PATH=/usr/bin:/usr/sbin
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+exec /usr/bin/gnome-session --session=gnome &
+
+Для удаленного сервера
+#!/bin/bash
+PATH=/usr/bin:/usr/sbin
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+exec startxfce4 &
+
+Задаем права 
+chmod 700 ~/.vnc/xstartup
+
+Далее пробрасываем SSH тунель и запускаем сервер
+Можно так запустить
+vncserver
+И можно запустить так чтобы только можно с локального сервера подключиться. Это безопаснее. 
+vncserver :1 -localhost
+
+
+Пробрасываем два ssh тунеля изменяя порт на одном 5901 а на удаленном 5911.
+[m.efoshkin@fedora ~]$  ssh  -L 5901:127.0.0.1:5901 -N -f -l max 192.168.150.39
+max@192.168.150.39's password: 
+[m.efoshkin@fedora ~]$  ssh  -L 5911:127.0.0.1:5901 -N -f -l epdv7n6s2re5cm2egn84 yc-user@158.160.14.4
+epdv7n6s2re5cm2egn84@158.160.14.4: Permission denied (publickey).
+[m.efoshkin@fedora ~]$  ssh  -L 5911:127.0.0.1:5901 -N -f -l  yc-user 158.160.14.4
+
+Установил клиента TigerVNC Client локально, через графический интерфейс.
+Так же можно запустить через vncviewer
+vncviewer 127.0.0.1:5901
+Спрашивает пароль 
+вводим rebrainme 
+и готово. 
+
+Прикладываю скришоты.
+
+https://disk.yandex.ru/i/Lu8BCygbeXgvQA
+
+
+### Ссылка на статью в форуме где нашел ответы на свои вопросы
+https://zalinux.ru/?p=3885
+И еще помогла эта статья тоже
+https://www.tecmint.com/install-and-configure-vnc-server-on-ubuntu/
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+06.12.2022 07:12
+Добрый день!
+
+Отличные знание темы и детальный разбор решения задания, замечаний и вопросов нет!
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+
+LNXA-11 01: Remote. VNC
+Описание:
+Наверняка, многие из вас сталкивались с программным решением TeamViewer, с помощью которого можно настроить удаленный доступ на Windows-ПК. Данное решение крайне популярно как для решения ряда офисных задач, так и для помощи в решении каких-либо насущных проблем среди наших знакомых и родственников. Но мало кто знает, что с помощью указанного программного продукта можно также получить удаленный доступ и на Linux-сервера, iOS, и даже RaspberryPi.
+
+TeamViewer чаще используется в Windows-системах, а в Unix-based системах властвует VNC - Virtual Network Computing - тоже платформонезависимое программное решение для получения удаленного доступа к визуальной оболочке рабочего стола. Среди возможностей VNC есть даже возможность запуска на Java (включая мобильную платформу J2ME). VNC использует RFB-протокол - это клиент-серверный протокол прикладного уровня для получения удаленного доступа к графическому удаленному рабочему столу. Одним из важных вопросов в данной теме является вопрос шифрования данных и VNC позволяет устанавливать сессию по SSH/SSL/VPN-tunnel и поверх IPsec. Однако стандартом для работы с VNC обычно считается организация сессии over SSH.
+
+Но давайте перейдем ближе к практике. Итак, для того чтобы организовать удаленный доступ до нашего Linux-сервера, нам понадобятся:
+
+VNC-сервер, установленный на Linux-сервере;
+VNC-клиент, установленный на машинке, с которой мы будем производить подключение (Linux, Windows, все, что угодно);
+SSH-соединение между клиентской и серверной машинами.
+И обязательно помним, что на вашем сервере должно быть установлено графическое окружение рабочего стола. Поскольку мы работаем на Desktop версии, то эта проблема решена, но на реальных серверах его нужно ставить (инструкцию о том, как это сделать, мы приложим в «Полезные ссылки»).
+
+После того, как с рабочим столом мы разобрались, необходимо произвести установку VNC-сервера, для чего можно воспользоваться TightVNC. После установки необходимо будет задать пароль с помощью команды vncpasswd. Включение сервера производится командой vncserver, а выключение - vncserver -kill :$DISPLAY_NUMBER (он будет отображен в stdout после включения сервера).
+
+После того, как мы включили TightVNC, он создаст в домашнем каталоге вашего пользователя директорию .vnc, в которой разместится конфигурационный файл xstartup. Его содержимое примерно следующее:
+
+#!/bin/sh
+
+# Uncomment the following two lines for normal desktop:
+# unset SESSION_MANAGER
+# exec /etc/X11/xinit/xinitrc
+
+[ -x /etc/vnc/xstartup ] && exec /etc/vnc/xstartup
+[ -r $HOME/.Xresources ] && xrdb $HOME/.Xresources
+xsetroot -solid grey
+vncconfig -iconic &
+xterm -geometry 80x24+10+10 -ls -title "$VNCDESKTOP Desktop" &
+gnome-session &
+Данный файл описывает базовые задачи, такие как конфигурация X-terminal window и запуск window-manager, в качестве которого в данном примере указан GNOME.
+
+После того, как конфигурация сервера будет закончена, можно будет установить VNC-client (мы рекомендуем тот же TightVNC) и настроить SSH-туннель между вашими машинами.
+
+Полезные ссылки:
+How to remotely display and control a Linux desktop from a Windows or Linux system using VNC
+Virtual Network Computing
+How to Install a Desktop on an Ubuntu Server
