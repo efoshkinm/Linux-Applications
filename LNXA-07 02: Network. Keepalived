@@ -1,0 +1,189 @@
+Задание:
+Предположим, что у нас есть два узла: LB1 и LB2, с интерфейсами eth0 и адресацией 192.168.10.10 и 192.168.10.11, соответственно. Задача - настроить keepalived согласно следующим условиям:
+должен использоваться виртуальный адрес 192.168.10.100;
+приоритет должен быть на узле LB2;
+должны быть включены уведомления на электронную почту через почтовый сервер на localhost;
+должна быть включена аутентификация;
+должны использоваться юникаст-уведомления;
+уведомления (advertisements) должны проходить каждые три секунды;
+должна быть указана директива, которая проверяла, запущен ли nginx локально. Если нет, хост должен переходить в состояние отключения;
+выборы должны происходить только на основе приоритетов, включая старт сервиса.
+Предоставить конфигурационные файлы для обоих хостов.
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+04.10.2022 23:31
+1. Установка
+LB1 
+address: 158.160.9.196
+
+LB2 
+address: 158.160.1.88
+
+LB1
+apt update & apt upgrade
+apt install keepalived
+
+LB2
+apt update & apt upgrade
+apt install keepalived
+
+
+Включаем IP forwarding  и bind to non-local IP address на обоих серверах.
+sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+echo "net.ipv4.ip_nonlocal_bind = 1" >> /etc/sysctl.conf
+sysctl -p
+
+
+2. Конфигурация keepalived.
+Брал отсюда
+https://kifarunix.com/configure-highly-available-haproxy-with-keepalived-on-ubuntu-20-04/
+
+
+LB1
+# Global Settings for notifications
+global_defs {
+    notification_email {
+        m.efoshkin@yandex.ru     # Email address for notifications 
+    }
+    notification_email_from service@domain.com	# The from address for the notifications
+    smtp_server 127.0.0.1     			# SMTP server address
+    smtp_connect_timeout 15
+}
+  
+# Define the script used to check if haproxy is still working
+vrrp_script chk_nginx { 
+    script "/usr/bin/killall -0 nginx"
+    interval 3
+    weight 2 
+}
+  
+# Configuration for Virtual Interface
+vrrp_instance LB_VIP {
+    interface eth0
+    state MASTER        # set to BACKUP on the peer machine
+    priority 100        # set to  99 on the peer machine
+    virtual_router_id 51
+  
+    smtp_alert          # Enable Notifications Via Email
+  
+    authentication {
+        auth_type AH
+        auth_pass myP@ssword	# Password for accessing vrrpd. Same on all devices
+    }
+    unicast_src_ip 192.168.10.10# Private IP address of master
+    unicast_peer {
+        192.168.10.11		# Private IP address of the backup haproxy
+   }
+  
+    # The virtual ip address shared between the two loadbalancers
+    virtual_ipaddress {
+        192.168.10.100
+    }
+     
+    # Use the Defined Script to Check whether to initiate a fail over
+    track_script {
+        chk_nginx
+    }
+}
+
+
+
+LB2
+# Global Settings for notifications
+global_defs {
+    notification_email {
+        m.efoshkin@yandex.ru     # Email address for notifications 
+    }
+    notification_email_from service@domain.com	# The from address for the notifications
+    smtp_server 127.0.0.1     			# SMTP server address
+    smtp_connect_timeout 15
+}
+  
+# Define the script used to check if haproxy is still working
+vrrp_script chk_nginx { 
+    script "/usr/bin/killall -0 nginx"
+    interval 3
+    weight 2 
+}
+  
+# Configuration for Virtual Interface
+vrrp_instance LB_VIP {
+    interface eth0
+    state BACKUP        # set to BACKUP on the peer machine
+    priority 110        # set to  99 on the peer machine
+    virtual_router_id 51
+  
+    smtp_alert          # Enable Notifications Via Email
+  
+    authentication {
+        auth_type PASS
+        auth_pass myP@ssword	# Password for accessing vrrpd. Same on all devices
+    }
+    unicast_src_ip 192.168.10.11 # Private IP address of master
+    unicast_peer {
+        192.168.10.10 	# Private IP address of the backup haproxy
+   }
+  
+    # The virtual ip address shared between the two loadbalancers
+    virtual_ipaddress {
+        192.168.10.100
+    }
+     
+    # Use the Defined Script to Check whether to initiate a fail over
+    track_script {
+        chk_nginx
+    }
+}
+
+
+systemctl enable --now keepalived
+systemctl status keepalived
+systemctl status keepalived
+ip --brief add
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+05.10.2022 09:15
+Добрый день!
+
+state явно не указываете, значит по умолчанию будет значение BACKUP, следовательно мастер будет выбран только после старта сервиса и голосования.
+
+Отличные знание темы и выполнение задания, хорошо что проверяете результат, замечаний и вопросов нет!
+
+
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+LNXA-07 02: Network. Keepalived
+Описание:
+Keepalived - это программное обеспечение для маршрутизации, написанное на C. Основная цель этого проекта - предоставить простые и надежные средства для балансировки нагрузки и обеспечения высокой доступности для систем Linux и инфраструктур на основе Linux. Платформа балансировки нагрузки опирается на хорошо известный и широко используемый модуль ядра Linux Virtual Server (IPVS), обеспечивающий балансировку нагрузки на четвертом (транспортном) уровне. Система основана на базе протокола VRRP (протокол резервирования виртуального маршрутизатора), который является широко используемым протоколом, обеспечивающим высокую доступность для сети (или подсети).
+
+Принципом работы является создание виртуального IP-адреса, где на базе протокола VRRP объявляется, что один из участвующих узлов является главным (master). Резервный узел (или узлы) прослушивает многоадресные (мультикаст) пакеты от узла с более высоким приоритетом. Если резервный узел не может принимать уведомления (advertisements) от VRRP в течение определенного периода, то резервный узел переходит в состояние главного узла (становится master) и назначает сконфигурированные IP-адреса на себя. В случае, если есть несколько резервных узлов с одинаковым приоритетом, тот, кто имеет наибольший IP-адрес, побеждает на выборах главного узла. Также существует возможность отключить использование мультикастов и указывать юникаст-адреса, то есть четко определять узлы, с которыми будет происходить обмен уведомлениями.
+
+В качестве примера приведем краткую конфигурацию одного узла:
+
+vrrp_instance APP {
+    state MASTER
+    interface eth0
+    virtual_router_id 101
+    priority 101
+    advert_int 3
+    virtual_ipaddress {
+        192.168.10.121
+    }
+}
+Важными значениями в конфигурации являются значения priority (от 0 до 255) и state (может принимать значения MASTER и BACKUP). Более высокий приоритет является указанием на выбор этого хоста в качестве MASTER. Параметр state же задает, чем хост будет являться при старте сервиса. В правильном варианте для всех хостов, кроме основного, должен использоваться state BACKUP и приоритет должен быть ниже, иначе, если мы настроим состояние BACKUP, но с более высоким приоритетом, чем у MASTER, то произойдут выборы и BACKUP выиграет и станет MASTER. Точно так же, если мы перезапустим keepalived в системе, настроенной с состоянием MASTER, он запустится в этом состоянии и вызовет перевыборы (которые он проиграет). В обоих случаях мы получим нежелательное поведение системы.
+
+Полезные ссылки:
+Keepalived Check and Notify Scripts
+рецепт отказоустойчивого Linux-роутера
+
