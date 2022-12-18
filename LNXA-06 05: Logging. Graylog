@@ -1,0 +1,291 @@
+Задание:
+Установите Graylog на вашем удаленном виртуальном сервере с доступом к нему из внешнего мира.
+Создайте в нем пользователя rebrainme с ролью Admin, который сможет аутентифицироваться с паролем graylog.
+Настройте Input типа Syslog UDP, который будет принимать сообщения на порту 55514.
+Создайте Index set External, который пишет логи в индексы с префиксом rebrainme. Индекс должен создаваться раз в день и максимальное число индексов для хранения — 10.
+Настройте принятие этого Input в Stream External Syslog, если в нем поле facility начинается на local. Хранение логов производится в Index set External.
+С локальной машины отправьте лог, который попадет в Stream External при помощи утилиты logger (команду сохраните).
+На проверку отправьте адрес для доступа к Graylog, время отправки лога и сохраненную команду отправки лога.
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+28.09.2022 16:39
+1. Установка
+address: 158.160.2.156
+
+
+Elastic
+scp elasticsearch-7.10.1-amd64.deb yc-user@158.160.10.36:~
+dpkg -i elasticsearch-7.10.1-amd64.deb
+systemctl enable --now elasticsearch
+##### config settings
+sudo tee -a /etc/elasticsearch/elasticsearch.yml > /dev/null <<EOT
+cluster.name: graylog
+action.auto_create_index: false
+EOT
+
+MongoDB
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 9DA31620334BD75D9DCB49F368818C72E52529D4
+echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.0.list
+sudo apt-get update
+sudo apt-get install -y mongodb-org
+sudo systemctl daemon-reload
+sudo systemctl enable mongod.service
+sudo systemctl restart mongod.service
+sudo systemctl --type=service --state=active | grep mongod
+
+Java
+sudo apt-get update && sudo apt-get upgrade
+sudo apt-get install apt-transport-https openjdk-11-jre-headless uuid-runtime pwgen
+
+Graylog
+sudo apt-get install apt-transport-https
+wget https://packages.graylog2.org/repo/packages/graylog-4.3-repository_latest.deb
+sudo dpkg -i graylog-4.3-repository_latest.deb
+sudo apt-get update
+sudo apt-get install graylog-server
+sudo systemctl enable --now graylog-server
+
+root@epd1ffli3q3seo7sc5jh:/home/yc-user# ss -lntup
+Netid    State      Recv-Q     Send-Q              Local Address:Port          Peer Address:Port    Process                                                                               
+udp      UNCONN     0          0                   127.0.0.53%lo:53                 0.0.0.0:*        users:(("systemd-resolve",pid=3407,fd=12))                                   
+udp      UNCONN     0          0                10.129.0.22%eth0:68                 0.0.0.0:*        users:(("systemd-network",pid=3386,fd=20))                             
+tcp      LISTEN     0          4096                127.0.0.53%lo:53                 0.0.0.0:*        users:(("systemd-resolve",pid=3407,fd=13))                                     
+tcp      LISTEN     0          128                       0.0.0.0:22                 0.0.0.0:*        users:(("sshd",pid=613,fd=3))                                                                   
+tcp      LISTEN     0          128                     127.0.0.1:27017              0.0.0.0:*        users:(("mongod",pid=12276,fd=11))                                                 
+tcp      LISTEN     0          4096           [::ffff:127.0.0.1]:9300                     *:*        users:(("java",pid=11078,fd=290))                                                           
+tcp      LISTEN     0          4096                        [::1]:9300                  [::]:*        users:(("java",pid=11078,fd=289))                                                                 
+tcp      LISTEN     0          128                          [::]:22                    [::]:*        users:(("sshd",pid=613,fd=4))                                                                      
+tcp      LISTEN     0          4096           [::ffff:127.0.0.1]:9200                     *:*        users:(("java",pid=11078,fd=293))                                                           tcp      LISTEN     0          4096                        [::1]:9200                  [::]:*        users:(("java",pid=11078,fd=292))                                                                 
+root@epd1ffli3q3seo7sc5jh:/home/yc-user# sudo systemctl start graylog-server
+
+Пароль
+root@epd1ffli3q3seo7sc5jh:/home/yc-user# echo -n "Enter Password: " && head -1 </dev/stdin | tr -d '\n' | sha256sum | cut -d" " -f1
+Enter Password: admin
+8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+
+vi /etc/graylog/server/server.conf
+root_password_sha2 = 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+password_secret = 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+
+
+root@epdmpb8us10k6umg9r6e:/home/yc-user# ss -lntup
+Netid     State      Recv-Q      Send-Q                Local Address:Port            Peer Address:Port     Process                                        
+udp       UNCONN     0           0                     127.0.0.53%lo:53                   0.0.0.0:*         users:(("systemd-resolve",pid=394,fd=12))     
+udp       UNCONN     0           0                  10.129.0.30%eth0:68                   0.0.0.0:*         users:(("systemd-network",pid=472,fd=20))     
+tcp       LISTEN     0           128                       127.0.0.1:27017                0.0.0.0:*         users:(("mongod",pid=2191,fd=11))             
+tcp       LISTEN     0           4096                  127.0.0.53%lo:53                   0.0.0.0:*         users:(("systemd-resolve",pid=394,fd=13))     
+tcp       LISTEN     0           128                         0.0.0.0:22                   0.0.0.0:*         users:(("sshd",pid=631,fd=3))                 
+tcp       LISTEN     0           4096             [::ffff:127.0.0.1]:9000                       *:*         users:(("java",pid=4657,fd=59))               
+tcp       LISTEN     0           4096             [::ffff:127.0.0.1]:9200                       *:*         users:(("java",pid=1054,fd=257))              
+tcp       LISTEN     0           4096                          [::1]:9200                    [::]:*         users:(("java",pid=1054,fd=256))              
+tcp       LISTEN     0           4096             [::ffff:127.0.0.1]:9300                       *:*         users:(("java",pid=1054,fd=254))              
+tcp       LISTEN     0           4096                          [::1]:9300                    [::]:*         users:(("java",pid=1054,fd=253))              
+tcp       LISTEN     0           128                            [::]:22                      [::]:*         users:(("sshd",pid=631,fd=4))                 
+root@epdmpb8us10k6umg9r6e:/home/yc-user# 
+
+
+nginx
+apt-get install nginx
+systemctl enable nginx
+systemctl start nginx
+
+server {
+    listen 80;
+    server_name 130.193.34.87;
+
+    location / {
+         proxy_pass http://127.0.0.1:5601; # full internal address
+         proxy_http_version  1.1;
+         proxy_set_header    Host $server_name:$server_port;
+         proxy_set_header    X-Forwarded-Host $http_host;    # necessary for proper absolute redirects and TeamCity CSRF check
+         proxy_set_header    X-Forwarded-Proto $scheme;
+         proxy_set_header    X-Forwarded-For $remote_addr;
+         proxy_set_header    Upgrade $http_upgrade; # WebSocket support
+      #   proxy_set_header    Connection $connection_upgrade; # WebSocket support
+    }
+}
+
+server {
+    listen 9301;
+    server_name 130.193.34.87;
+
+    location / {
+         proxy_pass https://127.0.0.1:9300; # full internal address
+         proxy_http_version  1.1;
+         proxy_set_header    Host $server_name:$server_port;
+         proxy_set_header    X-Forwarded-Host $http_host;    # necessary for proper absolute redirects and TeamCity CSRF check
+         proxy_set_header    X-Forwarded-Proto $scheme;
+         proxy_set_header    X-Forwarded-For $remote_addr;
+         proxy_set_header    Upgrade $http_upgrade; # WebSocket support
+      #   proxy_set_header    Connection $connection_upgrade; # WebSocket support
+    }
+}
+
+server {
+    listen 9201;
+    server_name 130.193.34.87;
+
+    location / {
+         proxy_pass https://127.0.0.1:9200; # full internal address
+         proxy_http_version  1.1;
+         proxy_set_header    Host $server_name:$server_port;
+         proxy_set_header    X-Forwarded-Host $http_host;    # necessary for proper absolute redirects and TeamCity CSRF check
+         proxy_set_header    X-Forwarded-Proto $scheme;
+         proxy_set_header    X-Forwarded-For $remote_addr;
+         proxy_set_header    Upgrade $http_upgrade; # WebSocket support
+      #   proxy_set_header    Connection $connection_upgrade; # WebSocket support
+    }
+}
+
+server
+{
+    listen 9001 default_server;
+    server_name 158.160.2.156; 
+
+   location / {
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Server $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Graylog-Server-URL http://$server_name/;
+      proxy_pass       http://127.0.0.1:9000;
+    }
+}
+
+
+ Проверка 
+ http://158.160.2.156:9001
+admin
+admin
+
+
+2. Отправка логов
+vi   /etc/rsyslog.conf
+local2.*                             @158.160.2.156:55514;RSYSLOG_SyslogProtocol23Format
+
+logger -p local2.info "This is my first loglogger -p local2.info "Hi, Graylogdd!"!"
+
+
+
+На проверку
+http://158.160.2.156:9001
+
+логин пароль:
+admin
+admin
+
+логин пароль заания
+rebrainme
+graylog
+
+Ура я наконецто это сделал!
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 4
+29.09.2022 10:26
+Добрый день!
+
+"Ура я наконецто это сделал!" - это хорошо, даже замечательно, действительно работает, но есть одно (на самом деле два) замечания!
+
+Как у Вас работают два ввода на одном порту одновременно?
+
+ An input has failed to start (triggered 18 hours ago)
+Input 63342b579fc56d6e3d813726 has failed to start on node 6787ade5-1946-41d8-a022-1457f2498536 for this reason: »bind(..) failed: Permission denied.«. This means that you are unable to receive any messages from this input. This is mostly an indication for a misconfiguration or an error.You can click here to solve this.
+Выводится же даже предупреждение, что один из них не работает.
+
+"Настройте Input типа Syslog UDP, который будет принимать сообщения на порту 55514" - надо не только назвать его так, но и настроить чтобы использовался протокол UDP.
+
+При отправке тестового сообщения не забудьте проверить, что отправляете именно по UDP!
+
+29.09.2022 15:03
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+29.09.2022 15:03
+Я TCP 55514 делал для тестов. Strem подвязан только к UDP 55514.
+
+Удалил TCP Syslog.
+
+Остальное не менял, потому что они вроде как по инструкции настроено.
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+30.09.2022 09:14
+Добрый день!
+
+Отличные знание темы и выполнение задания, замечаний и вопросов нет!
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+
+LNXA-06 05: Logging. Graylog
+Описание:
+Как вы могли понять по предыдущему заданию, построение своего кластера с ES похоже на своеобразный конструктор — берем один из вариантов ElasticSearch для хранения, как скелет, для удобства поиска используем Kibana, а для отправки данных выбираем одно из многих решений, исходя из своих потребностей. Хотя такой подход и предоставляет большую гибкость, но требует понимания, как эти компоненты работают друг с другом и как настраивать каждую из них. В некоторых же случаях хочется иметь решение, которое ставится чуть ли не одним пакетом, умеет получать логи по протоколу syslog, который есть на каждом сервере, но все еще иметь возможность поиска по документам.
+
+В этом задании мы как раз рассмотрим такое решение, которое можно использовать вместо стека EFK (или любой другой его вариации). Имя этого решения — Graylog.
+
+Из названия этого инструмента становится понятно, на что делается упор в реализации — именно логи, а не абстрактные документы. И да, работает этот инструмент с логами очень хорошо.
+
+Для начала давайте разберем архитектуру этого инструмента в первом приближении:
+
+Архитектура Graylog
+
+Как видно, сервер Graylog состоит из трех компонент:
+
+Graylog — сам сервер, который выполняет бОльшую часть логики, которую мы будем разбирать далее.
+ElasticSearch — сюрприз, от ES мы не отделались. Именно он используется в Graylog для хранения логов, то есть, по факту, мы все еще используем то же решение в роли хранилища, но это остается за кадром, так как всю логику работы на себя забирает Graylog.
+MongoDB — используется для хранения конфигурации Graylog. Далее мы с вами поговорим, что может хранить в себе Graylog, так как хранить там можно много чего.
+Каждую из этих компонент можно горизонтально расширить для увеличения хранилища или отказоустойчивости, но для простоты мы будем рассматривать однонодовую инсталляцию с одним инстансом каждой из компонент.
+
+При входе в административный кабинет инструмента можно сразу заметить, что Graylog вводит понятие аутентификации, то есть, для доступа в систему необходимо иметь пользователя (что требовало отдельных действий в EFK стеке).
+
+Главный экран Graylog
+
+Как видно, при первичном входе в систему Graylog дает пошаговую инструкцию по тому, как пользоваться всеми возможностями — от настройки приема данных до создания уведомлений по событиям. Суммарно Graylog предлагает овладеть всего 4 сущностями:
+
+Stream — определяет, в какие индексы будут сохраняться данные;
+Search — позволяет производить поиск про сохраненным событиям;
+Dashboard — организация запросов в различные отчеты с разными видами визуализации;
+Alerts — создание правил уведомлений по вашим событиям.
+В рамках этого задания мы рассмотрим лишь первые 2 сущности.
+
+Streams
+
+Начнем со Stream. Доступ к интерфейсу работы с потоками данных производится через кнопку в заголовке, откуда предоставляется доступ ко всем потокам. Однако по умолчанию потоки не подключены к точкам входа (input) и выхода (output) пакетов. Для конфигурации этих вещей нужно зайти в заголовке в раздел System, далее — Inputs или Outputs.
+
+Так как по умолчанию не создается ни одного Input, то пройдемся по нему:
+
+Inputs
+
+В выделенном поле ввода можно выбрать нужный тип Input и запустить его, предварительно указав необходимые параметры запуска. Список плагинов начинается с нативного и гибкого формата GELF (Graylog Extended Log Format), заканчивается простым Syslog по TCP или UDP. Если же вам нужно что-то более редкое, то можно попробовать найти плагин, который позволит работать с этим источником данных. Для примера рассмотрим, как выглядит конфигурация Syslog UDP:
+
+Input Syslog UDP
+
+Для Syslog UDP большинство параметров вам должно быть ясно из заданий по syslog. После создания Input мы можем подключить его к одному из стримов, либо же он будет подключен к стриму по умолчанию (в нашем случае стрим All messages). Для просмотра приходящих логов мы можем воспользоваться последней рассматриваемой функцией Graylog — Search. Доступ к ней производится либо через выбор конкретного Stream для сокращения выборки, либо через переход в одноименный раздел в заголовке. В этом же интерфейсе мы можем приостановить работу Input на случай, если что-то начинает спамить или требуется провести работы.
+
+Search
+
+Данный интерфейс представляет аналог Kibana для EFK стека, однако в нем решены некоторые вещи, которых может не хватать в Kibana, как, например, экспорт результатов в CSV. В остальном же возможности сопоставимы с Kibana. Более того, за счет того, что хранилищем логов в Graylog все равно является ElasticSearch, то для запросов используется тот же язык запросов, что и в ES.
+
+Раз мы поговорили про Inputs, стоит поговорить и про Outputs. Graylog может работать не только в роли системы для централизованного хранения логов, но и может использоваться как нода в более сложном каскаде сбора логов, отправляя их на следующие, более крупные ноды. Это может быть полезно, если вам нужно организовать федеративное хранилище логов в компании, то есть, чтобы у каждого департамента был доступ к нужным им логам и все логи были также доступны в одном большом кластере.
+
+Как мы сказали в самом начале, Graylog поставляется с инструментами для авторизации и аутентификации пользователей. И если по умолчанию используется простая связка логин/пароль, которая хранится в базе, Graylog также умеет работать с LDAP.
+
+Кроме работы с логами, Graylog также позволяет работать с самим ElasticSearch — отслеживать состояние кластера и отдельных нод, в частности, настраивать политики ротации логов, что, напомним, требовало отдельных инструментов до недавнего времени в EFK стеке.
+
+Полезные ссылки:
+Graylog official site
+Открытое решение Graylog
+Graylog2 стал удобнее и быстрее (habr)
+Searching
