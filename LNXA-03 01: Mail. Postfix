@@ -1,0 +1,330 @@
+Задание:
+На удаленном виртуальном сервере установите postfix.
+Настройте сервер postfix для работы на домене rebrainme.local с работой на localhost без доступа извне.
+Создайте пользователя rebrainme-mail на удаленном сервере.
+Отправьте письмо от пользователя root@rebrainme.local пользователю rebrainme-mail@rebrainme.local из консоли (команду и вывод сохраните).
+Прочитайте отправленное письмо из почтового ящика пользователя rebrainme-mail (команду и вывод сохраните).
+На проверку отправьте конфигурационные файлы postfix, сохраненные команды и их выводы.
+
+
+******************************************************************************************
+Решение
+******************************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+26.07.2022 08:59
+Создание виртуалки
+address: 51.250.106.215
+
+2. Настройте сервер postfix для работы на домене rebrainme.local с работой на localhost без доступа извне.
+root@epdbtlu34igo2pgvqmks:/home/yc-user# apt-get install mailutils
+Там при установке постфикс он спросил меня какой тип сервера. Я указал локальный и спросил имя, я дал rebrainme.local.
+3. Создайте пользователя rebrainme-mail на удаленном сервере.
+root@epdbtlu34igo2pgvqmks:/home/yc-user# useradd rebrainme-mail
+
+4. Отправьте письмо от пользователя root@rebrainme.local пользователю rebrainme-mail@rebrainme.local из консоли (команду и вывод сохраните).
+root@epdbtlu34igo2pgvqmks:/home/yc-user# echo "Hi mate!" | mail -s "Rebrain letter" -aFrom:Maksim\<root@rebrainme.local\> rebrainme-mail@rebrainme.local
+root@epdbtlu34igo2pgvqmks:/home/yc-user# 
+
+5. Прочитайте отправленное письмо из почтового ящика пользователя rebrainme-mail (команду и вывод сохраните).
+Отправил письмо и смотрю почту
+root@epdbtlu34igo2pgvqmks:/home/yc-user# su rebrainme-mail
+$ mail
+"/var/mail/rebrainme-mail": 1 message 1 new
+>N   1 Maksim             Tue Jul 26 05:49  13/514   Rebrain letter
+? 1
+Return-Path: <root@rebrainme.local>
+X-Original-To: rebrainme-mail@rebrainme.local
+Delivered-To: rebrainme-mail@rebrainme.local
+Received: by epdbtlu34igo2pgvqmks.auto.internal (Postfix, from userid 0)
+	id 90FD027E6F; Tue, 26 Jul 2022 05:49:38 +0000 (UTC)
+Subject: Rebrain letter
+From: Maksim<root@rebrainme.local>
+To: <rebrainme-mail@rebrainme.local>
+X-Mailer: mail (GNU Mailutils 3.7)
+Message-Id: <20220726054938.90FD027E6F@epdbtlu34igo2pgvqmks.auto.internal>
+Date: Tue, 26 Jul 2022 05:49:38 +0000 (UTC)
+
+Hi mate!
+? 
+6. На проверку отправьте конфигурационные файлы postfix, сохраненные команды и их выводы.
+root@epdbtlu34igo2pgvqmks:/etc/postfix# cat main.cf
+# See /usr/share/postfix/main.cf.dist for a commented, more complete version
+
+
+# Debian specific:  Specifying a file name will cause the first
+# line of that file to be used as the name.  The Debian default
+# is /etc/mailname.
+#myorigin = /etc/mailname
+
+smtpd_banner = $myhostname ESMTP $mail_name (Ubuntu)
+biff = no
+
+# appending .domain is the MUA's job.
+append_dot_mydomain = no
+
+# Uncomment the next line to generate "delayed mail" warnings
+#delay_warning_time = 4h
+
+readme_directory = no
+
+# See http://www.postfix.org/COMPATIBILITY_README.html -- default to 2 on
+# fresh installs.
+compatibility_level = 2
+
+# TLS parameters
+smtpd_tls_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
+smtpd_tls_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_tls_security_level=may
+
+smtp_tls_CApath=/etc/ssl/certs
+smtp_tls_security_level=may
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+
+smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
+myhostname = epdbtlu34igo2pgvqmks.auto.internal
+alias_maps = hash:/etc/aliases
+alias_database = hash:/etc/aliases
+myorigin = /etc/mailname
+mydestination = rebrainme.local, $myhostname, epdbtlu34igo2pgvqmks.auto.internal, localhost.auto.internal, localhost
+relayhost = 
+mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
+mailbox_size_limit = 0
+recipient_delimiter = +
+inet_interfaces = loopback-only
+default_transport = error
+relay_transport = error
+inet_protocols = all
+root@epdbtlu34igo2pgvqmks:/etc/postfix#
+
+
+root@epdbtlu34igo2pgvqmks:/etc/postfix# cat master.cf | grep -v '#'
+smtp      inet  n       -       y       -       -       smtpd
+pickup    unix  n       -       y       60      1       pickup
+cleanup   unix  n       -       y       -       0       cleanup
+qmgr      unix  n       -       n       300     1       qmgr
+tlsmgr    unix  -       -       y       1000?   1       tlsmgr
+rewrite   unix  -       -       y       -       -       trivial-rewrite
+bounce    unix  -       -       y       -       0       bounce
+defer     unix  -       -       y       -       0       bounce
+trace     unix  -       -       y       -       0       bounce
+verify    unix  -       -       y       -       1       verify
+flush     unix  n       -       y       1000?   0       flush
+proxymap  unix  -       -       n       -       -       proxymap
+proxywrite unix -       -       n       -       1       proxymap
+smtp      unix  -       -       y       -       -       smtp
+relay     unix  -       -       y       -       -       smtp
+        -o syslog_name=postfix/$service_name
+showq     unix  n       -       y       -       -       showq
+error     unix  -       -       y       -       -       error
+retry     unix  -       -       y       -       -       error
+discard   unix  -       -       y       -       -       discard
+local     unix  -       n       n       -       -       local
+virtual   unix  -       n       n       -       -       virtual
+lmtp      unix  -       -       y       -       -       lmtp
+anvil     unix  -       -       y       -       1       anvil
+scache    unix  -       -       y       -       1       scache
+postlog   unix-dgram n  -       n       -       1       postlogd
+maildrop  unix  -       n       n       -       -       pipe
+  flags=DRhu user=vmail argv=/usr/bin/maildrop -d ${recipient}
+uucp      unix  -       n       n       -       -       pipe
+  flags=Fqhu user=uucp argv=uux -r -n -z -a$sender - $nexthop!rmail ($recipient)
+ifmail    unix  -       n       n       -       -       pipe
+  flags=F user=ftn argv=/usr/lib/ifmail/ifmail -r $nexthop ($recipient)
+bsmtp     unix  -       n       n       -       -       pipe
+  flags=Fq. user=bsmtp argv=/usr/lib/bsmtp/bsmtp -t$nexthop -f$sender $recipient
+scalemail-backend unix	-	n	n	-	2	pipe
+  flags=R user=scalemail argv=/usr/lib/scalemail/bin/scalemail-store ${nexthop} ${user} ${extension}
+mailman   unix  -       n       n       -       -       pipe
+  flags=FR user=list argv=/usr/lib/mailman/bin/postfix-to-mailman.py
+  ${nexthop} ${user}
+
+root@epdbtlu34igo2pgvqmks:/etc/postfix# 
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 5
+27.07.2022 00:07
+Здравствуйте, всё верно, с заданием справиись успешно.
+
+
+
+*****************************************************************
+Теория
+*****************************************************************
+LNXA-03 01: Mail. Postfix
+Описание:
+С древних времен существовала необходимость передачи информациии на дальние расстояния, и постоянно появлялись новые, более совершенные методы. От гонцов — до почты (в том числе голубиной), от телеграфа — до телефона, от электронной почты — до мессенджеров — основными критериями успеха и масштаба распространения нового метода являются скорость и удобство. Так, сейчас сложно представить жизнь без возможности связаться с другим человеком мгновенно звонком или сообщением в мессенджере либо послать уведомление или электронные документы на другой край мира. В рамках следующих двух заданий мы сконцентрируемся именно на создании собственной инфраструктуры электронной почты.
+
+Условно принцип работы электронной почты не сильно отличается от обычной бумажной — у вас есть сервис, который отправляет и принимает почту (сродни почтовому отделению), а также почтовый ящик, в который кладут приходящие вам письма. В рамках этого задания мы рассмотрим, как и при помощи чего можно построить свое виртуальное отделение почты.
+
+Перед тем, как разбираться с конкретным инструментом, давайте посмотрим, как на техническом уровне работает электронная почта. Для этого представим, что вы хотите отправить сообщение родителем с фотографиями из отпуска. Для этого вы используете либо веб-версию почтового сервиса, который вы выбрали, либо настроенный клиент на хосте, который умеет отправлять электронную почту на сервер почтового сервиса по протоколу SMTP (Simple Mail Transfer Protocol).
+
+При отправке письма производится авторизация с вашими данными для подключения к почтовому серверу, которому мы сообщаем, что хотим отправить письмо (тело которого в SMTP передается в параметре DATA) от определенного имени (как правило, адрес вашей электронной почты, но бывает и отправка от имени другого адреса — этот параметр в терминах SMTP называется MAIL FROM) на другой адрес (RCPT TO).
+
+Для конкретики скажем, что вы отправляете сообщение «Привет, мама! Вот ссылка на фотографии с моего отпуска — https://www.4shared.com/photo/tJOecx6V/Vacation.html» с адреса johndoe1990@yandex.ru на адрес momandpop1961@bk.ru.
+
+Получив ваш запрос, сервер сначала производит авторизацию с вашими данными и, если все в порядке, отправляет письмо в очередь отправки. Когда наступает очередь обработать ваше письмо, сервер проверяет все отправляемые данные (к примеру, разрешено ли вам отправлять с указанного адреса), после чего определяет, на какой сервер нужно отправить это письмо — для этого SMTP сервер производит следующие действия:
+
+получить домен из адреса получателя (в нашем случае — bk.ru);
+получаем DNS-запись типа MX этого домена (возвращено будет bk.ru mail is handled by 10 mxs.mail.ru.);
+отправит ваше письмо на домен, возвращенный в результате запроса по протоколу SMTP (вероятнее всего, по защищенному TLS-порту 465, но возможно, и 25 — на других доменах).
+Дальнейшая логика работы остается на стороне удаленного сервера — он примет письмо, проведет ряд проверок по безопасности, исходя из адреса, с которого отправлялись письма, для подтверждения того, что письмо валидно и не является спамом, после чего положит письмо в почтовый ящик наших гипотетических родителей, которые смогут посмотреть ваши фотографии тогда, когда увидят это письмо при очередном входе в почтовый клиент.
+
+В нашем случае обработка письма скорее всего закончится успешно, однако, если бы мы опечатались в имени пользователя, целевой сервер мог бы отправить нам в ответ сообщение о том, что адрес не существует, либо, если мы опечатались в домене, уже сервер мог бы уведомить нас об этом (нет домена, нет MX записи, если вообще есть даже A запись).
+
+На этом разбирать принцип работы SMTP на пальцах мы закончим, хотя, конечно, каждый из этих этапов может содержать подводные камни, с которыми проще разбираться уже по факту настройки реального почтового сервера.
+
+Типичный сервер электронной почты состоит из 2 компонент:
+
+MTA (Mail Transfer Agent) — агент пересылки почты, в задачи которого входит прием и передача почты. Очень часто (в Linux / UNIX) МТА называют также почтовым сервером. MTA работает по протоколу SMTP, и его одного, в принципе, уже достаточно для создания системы электронной почты, однако чтение почты с такого сервера требует знать, как это делать.
+MDA (Mail Delivery Agent) — агент доставки почты. Его задача — по запросу почтового клиента передать ему почту из почтового ящика на сервере.
+В рамках этого задания мы разберемся с тем, как настроить свой MTA с использованием инструмента postfix, в следующем же задании разберемся в MDA.
+
+Конфигурация postfix состоит из 2 файлов:
+
+/etc/postfix/master.cf — используется для конфигурации сервисов postfix (об этом чуть ниже);
+/etc/postfix/main.cf — отвечает за конфигурацию MTA.
+Тут необходимо остановиться и сказать, как работает postfix. Сам по себе postfix является модульным MTA, в котором необходимо подключать сервисы для активации конкретной логики. Все сервисы запускаются как подпроцессы master процесса postfix, где postfix выступает в роли супервизора процессов.
+
+Базовая схема отправки сообщений следующая:
+
+Схема отправки сообщений Postfix
+
+Как видно, существует 3 основных точки входа для писем — smtpd (используется для принятия запросов по SMTP), qmqpd (используется для работы с протоколом QMQP — Quick Mail Queuing Protocol — который призван заменить SMTP как более быстрое решение, однако мир стабильно пользуется SMTP) и maildrop (сервис для принятия сообщений на самом хосте, но нас в рамках этой задачи это не интересует).
+
+Разберем конфигурационный файл master.cf:
+
+# ==========================================================================
+# service type  private unpriv  chroot  wakeup  maxproc command + args
+#               (yes)   (yes)   (no)    (never) (100)
+# ==========================================================================
+smtp      inet  n       -       y       -       -       smtpd
+pickup    unix  n       -       y       60      1       pickup
+cleanup   unix  n       -       y       -       0       cleanup
+qmgr      unix  n       -       n       300     1       qmgr
+tlsmgr    unix  -       -       y       1000?   1       tlsmgr
+rewrite   unix  -       -       y       -       -       trivial-rewrite
+bounce    unix  -       -       y       -       0       bounce
+defer     unix  -       -       y       -       0       bounce
+trace     unix  -       -       y       -       0       bounce
+verify    unix  -       -       y       -       1       verify
+flush     unix  n       -       y       1000?   0       flush
+proxymap  unix  -       -       n       -       -       proxymap
+proxywrite unix -       -       n       -       1       proxymap
+smtp      unix  -       -       y       -       -       smtp
+relay     unix  -       -       y       -       -       smtp
+        -o syslog_name=postfix/$service_name
+showq     unix  n       -       y       -       -       showq
+error     unix  -       -       y       -       -       error
+retry     unix  -       -       y       -       -       error
+discard   unix  -       -       y       -       -       discard
+local     unix  -       n       n       -       -       local
+virtual   unix  -       n       n       -       -       virtual
+lmtp      unix  -       -       y       -       -       lmtp
+anvil     unix  -       -       y       -       1       anvil
+scache    unix  -       -       y       -       1       scache
+maildrop  unix  -       n       n       -       -       pipe
+  flags=DRhu user=vmail argv=/usr/bin/maildrop -d ${recipient}
+uucp      unix  -       n       n       -       -       pipe
+  flags=Fqhu user=uucp argv=uux -r -n -z -a$sender - $nexthop!rmail ($recipient)
+ifmail    unix  -       n       n       -       -       pipe
+  flags=F user=ftn argv=/usr/lib/ifmail/ifmail -r $nexthop ($recipient)
+bsmtp     unix  -       n       n       -       -       pipe
+  flags=Fq. user=bsmtp argv=/usr/lib/bsmtp/bsmtp -t$nexthop -f$sender $recipient
+scalemail-backend unix	-	n	n	-	2	pipe
+  flags=R user=scalemail argv=/usr/lib/scalemail/bin/scalemail-store ${nexthop} ${user} ${extension}
+mailman   unix  -       n       n       -       -       pipe
+  flags=FR user=list argv=/usr/lib/mailman/bin/postfix-to-mailman.py
+  ${nexthop} ${user}
+service — имя сервиса, должно быть уникально;
+type — тип используемого сокета. inet означает использование TCP сокета, unix — UNIX socket (то есть, доступный только в системе);
+private (yes) — должен ли этот сервис быть доступен извне (по умолчанию — значение yes, то есть, у параметра не стоит n (no), а, к примеру, -, это означает использование значения по умолчанию);
+unpriv (yes) — запускать сервис в от имени непривилегированного пользователя;
+chroot (no) — запускать сервис в chroot, то есть, отдельном окружении;
+wakeup (never) — как часто требуется отправлять запросы на запуск сервиса. Работает как своеобразные cron внутри postfix;
+maxproc (100) — определяет, какое количество процессов этого сервиса может быть запущено. Значение 0 означает, что можно выделять неограниченное количество;
+command + args — определяет, какую компоненту нужно запускать для этого сервиса (могут повторяться). Кроме самой команды, также передаются параметры запуска. Так, к примеру, у сервиса relay передается параметр -o syslog_name=postfix/$service_name, который перезаписывает (override) глобальный параметр запуска с именем сервиса, который будет передаваться в syslog.
+В этом файле по умолчанию находится большое количество заготовок для запуска других сервисов, в том числе при помощи команды pipe, которая запускает другую утилиту для обработки пакетов.
+
+Файл main.cf является основным файлом, в котором производится конфигурация параметров всех сервисов. По умолчанию конфигурационный файл довольно мал:
+
+# egrep -v "(^#.*|^$)" main.cf
+smtpd_banner = $myhostname ESMTP $mail_name (Ubuntu)
+biff = no
+append_dot_mydomain = no
+readme_directory = no
+compatibility_level = 2
+smtpd_tls_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
+smtpd_tls_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_use_tls=yes
+smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
+myhostname = localhost
+alias_maps = hash:/etc/aliases
+alias_database = hash:/etc/aliases
+mydestination = $myhostname, localhost, localhost.localdomain, , localhost
+relayhost =
+mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
+mailbox_size_limit = 0
+recipient_delimiter = +
+inet_interfaces = all
+inet_protocols = all
+Но это немного обманчиво — даже с учетом комментариев этот файл не содержит всех параметров (полный список можно получить в 5 разделе man под названием postconf). Также полный файл со всеми параметрами и всеми значениями по умолчанию можно просмотреть в файле /etc/postfix/main.cf.default. Менять его не стоит — он представляет собой чисто информационный файл.
+
+Конфигурационного файла по умолчанию должно хватать для корректной работы на домене, который вы указывали при установке пакета (если выбрали Internet site).
+
+Проверим работоспособность сервера, отправив себе письмо. Для работы с почтой из консоли можно использовать утилиту mail, которая входит в пакет mailutils. Пример отправки письма выглядит следующим образом (при условии, что домен localhost присутствует в вашем параметре mydestinations):
+
+mail -s "test" root@localhost <<< "Here comes the test"
+
+Теперь, когда мы переключимся на пользователя root, можем прочитать наше сообщение:
+
+dolan@hh1:~$ sudo -i
+root@hh1:~# mail
+"/var/mail/root": 1 message 1 new
+>N   1 Dolan User         Sun Nov 22 18:05  13/436   test2
+? p 1
+Return-Path: <dolan@hh1.justdolanit.net>
+X-Original-To: root@localhost
+Delivered-To: root@localhost
+Received: by localhost (Postfix, from userid 1000)
+	id 4ED99439C1; Sun, 22 Nov 2020 18:05:11 +0000 (UTC)
+Subject: test2
+To: <root@localhost>
+X-Mailer: mail (GNU Mailutils 3.4)
+Message-Id: <20201122180511.4ED99439C1@localhost>
+Date: Sun, 22 Nov 2020 18:05:11 +0000 (UTC)
+From: Dolan User <dolan@hh1.justdolanit.net>
+
+Here comes the test
+? q
+Saved 1 message in /root/mbox
+Held 0 messages in /var/mail/root
+root@hh1:~# mail
+В логах же отправка сообщения выглядит следующим образом:
+
+Nov 22 18:01:09 hh1.justdolanit.net postfix/cleanup[27531]: 3098B439C1: message-id=<20201122180109.3098B439C1@localhost>
+Nov 22 18:01:09 hh1.justdolanit.net postfix/qmgr[26356]: 3098B439C1: from=<dolan@hh1.justdolanit.net>, size=356, nrcpt=1 (queue active)
+Nov 22 18:01:09 hh1.justdolanit.net postfix/smtp[27533]: 3098B439C1: to=<root@hh1.justdolanit.net>, relay=none, delay=0.19, delays=0.03/0.06/0.1/0, dsn=5.4.6, status=bounced (mail for hh1.justdolanit.net loops back to myself)
+Nov 22 18:01:09 hh1.justdolanit.net postfix/cleanup[27531]: 60D77439C2: message-id=<20201122180109.60D77439C2@localhost>
+Nov 22 18:01:09 hh1.justdolanit.net postfix/qmgr[26356]: 60D77439C2: from=<>, size=2241, nrcpt=1 (queue active)
+Nov 22 18:01:09 hh1.justdolanit.net postfix/bounce[27534]: 3098B439C1: sender non-delivery notification: 60D77439C2
+Nov 22 18:01:09 hh1.justdolanit.net postfix/qmgr[26356]: 3098B439C1: removed
+Nov 22 18:01:09 hh1.justdolanit.net postfix/smtp[27533]: 60D77439C2: to=<dolan@hh1.justdolanit.net>, relay=none, delay=0.07, delays=0.03/0/0.04/0, dsn=5.4.6, status=bounced (mail for hh1.justdolanit.net loops back to myself)
+Nov 22 18:01:09 hh1.justdolanit.net postfix/qmgr[26356]: 60D77439C2: removed
+Как видно, все прочитанные сообщения, если их не удалять, сохраняются в файл mbox пользователя, в котором письмо можно прочитать позднее.
+
+Тот же инструмент можно использовать и для отправки писем (правда, скорее всего они попадут в спам, но это совсем другая история).
+
+Полезные ссылки:
+Как появилась электронная почта: история с соб@чкой
+Что такое протокол SMTP
+Postfix official site
+Postfix (ubuntu rus wiki)
+Postfix (archlinux wiki)
+Postfix Architecture Overview
+Linux mail command examples – send mails from command line
+Почтовый сервер для начинающих. Структура и принцип работы
+How To Set Up a Postfix E-Mail Server with Dovecot
