@@ -1,0 +1,434 @@
+Задание:
+Напишите конфигурационный файл nginx, взяв за основу конфигурационный файл из предыдущего задания, который реализует следующую функциональность:
+Отключен модуль mail.
+В отдельном конфигурационном файле должен быть описан server, который слушает на 80 порту и использует домен, полученный при помощи сервиса http://nip.io/. Например, Ваш публичный адрес 100.101.102.103, тогда один из вариантов имени будет app.100.101.102.103.nip.io. Если этот сервис недоступен, то можно воспользоваться любым аналогичным.
+Используется формат логов с именем logz, который содержит только информацию о том, откуда был произведен запрос, в какое время, какой был произведен запрос и какой HTTP код был возвращен при запросе.
+Логи должны писаться в файл /var/log/nginx/nip.access.log.
+Разрешены обращения со всех хостов, кроме 10.10.10.10.
+Для всех путей используется basic auth с пользователем rebrain и паролем linux, кроме /noauth/*.
+В роли root используется /var/www/html/.
+В роли index - /var/www/html/index.nginx-debian.html, которая должна возвращаться при обращении к /.
+Путь /rbm_images/* должен отдавать файлы из /var/www/rebrain/images/, в котором должен быть расположен файл http://rebrainme.com/files/logo_rebrain_black.png под именем logo.png.
+Запрос на /example/ должен проксироваться на https://example.com/, обращение к которому производится через upstream.
+В ответе пришлите:
+конфигурационный файл default сервер и путь до него;
+конфигурационный файл для основного сервера и путь до него;
+список файлов в /etc/nginx/modules-enabled/;
+содержимое файла, используемого для basic auth.
+
+
+***********************************************************************************
+Решение
+***********************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+03.06.2022 10:35
+1. Создание виртуалки под второе задание.
+[m.efoshkin@MiWiFi-R4A-srv lnxa]$ yc compute instance create     --name efoshkin-lnxa-01-02     --network-interface subnet-name=default-ru-central1-b,nat-ip-version=ipv4     --zone ru-central1-b     --ssh-key ~/.ssh/id_rsa.pub     --cores 2     --core-fraction 5     --preemptible     --create-boot-disk image-folder-id=standard-images,image-family=ubuntu-2004-lts     --labels user_email=maxefoshkin@gmail.com,task_name=lnxa-01-02
+done (20s)
+id: epddc3ia5726tb0gb0tt
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-06-03T05:55:41Z"
+name: efoshkin-lnxa-01-02
+labels:
+  task_name: lnxa-01-02
+  user_email: maxefoshkin@gmail.com
+zone_id: ru-central1-b
+platform_id: standard-v2
+resources:
+  memory: "2147483648"
+  cores: "2"
+  core_fraction: "5"
+status: RUNNING
+boot_disk:
+  mode: READ_WRITE
+  device_name: epd6og2srhkg1hmad74p
+  auto_delete: true
+  disk_id: epd6og2srhkg1hmad74p
+network_interfaces:
+- index: "0"
+  mac_address: d0:0d:d6:0e:4a:29
+  subnet_id: e2lebfr9cjkjg4ruk3gn
+  primary_v4_address:
+    address: 10.129.0.10
+    one_to_one_nat:
+      address: 62.84.122.212
+      ip_version: IPV4
+fqdn: epddc3ia5726tb0gb0tt.auto.internal
+scheduling_policy:
+  preemptible: true
+network_settings:
+  type: STANDARD
+placement_policy: {}
+
+
+2. Поднятие nginx и добавить конфиги из предыдущего задания
+root@epddc3ia5726tb0gb0tt:/etc/nginx/sites-enabled# cat nip 
+log_format logz '$remote_addr [$time_local]'
+                '"$request" $status';
+
+server {
+       listen 80 default_server;
+       listen [::]:80 default_server;
+
+       access_log /var/log/nginx/nip.access.log logz;
+
+       server_name 62.84.122.212.nip.io;
+
+       root /var/www/html;
+
+#       index index.nginx-debian.html;
+
+       location / {
+                
+              index index.nginx-debian.html;
+              try_files  $uri $uri/ =404;
+       }
+
+       location /rbm_images/* {
+              alias /var/www/rebrain/images/ ;
+            #  try_files $uri $uri/ *;
+              autoindex on;
+
+       }
+}
+
+
+
+
+
+3. Создание базавой аутентификации
+
+# Install apache2 utils 
+root@epddc3ia5726tb0gb0tt:/etc/nginx/sites-enabled# apt install apache2-utils
+
+root@epddc3ia5726tb0gb0tt:/etc/nginx/sites-enabled# htpasswd -c /etc/nginx/.htpasswd rebrain
+New password: 
+Re-type new password: 
+Adding password for user rebrain
+root@epddc3ia5726tb0gb0tt:/etc/nginx/sites-enabled# cd ..
+root@epddc3ia5726tb0gb0tt:/etc/nginx# cat .htpasswd 
+rebrain:$apr1$Ruhz.2xn$dPB/GmJZkQ2wFf70oOWos/
+root@epddc3ia5726tb0gb0tt:/etc/nginx# 
+
+
+4. Итог
+Содержимое основного фала.
+
+root@epddc3ia5726tb0gb0tt:/etc/nginx/sites-enabled# cat nip 
+log_format logz '$remote_addr [$time_local]'
+                '"$request" $status';
+								
+resolver 8.8.8.8;
+upstream  example {
+     server  example.com:443;
+}
+
+server {
+       listen 80 default_server;
+       listen [::]:80 default_server;
+       deny 10.10.10.10;
+       allow all;
+       auth_basic         "Rebrain lnxa 01 02";
+       auth_basic_user_file    /etc/nginx/.htpasswd;
+       access_log /var/log/nginx/nip.access.log logz;
+       server_name 62.84.122.212.nip.io;
+       root /var/www/html;
+#       index index.nginx-debian.html;
+       location / {          
+              index index.nginx-debian.html;
+              try_files  $uri $uri/ =404;
+       }
+       location /rbm_images/* {
+              alias /var/www/rebrain/images/ ;
+            #  try_files $uri $uri/ *;
+              autoindex on;
+       }       
+       location /noauth/* {
+            auth_basic off;
+       }
+       location /example/ {
+            proxy_pass http://example;
+       }
+}
+
+root@epddc3ia5726tb0gb0tt:/etc/nginx/sites-enabled# 
+
+
+
+
+
+
+
+
+
+
+# Это дефолтный файл, по умолчанию в нджинксе. Не знаю зачем он вам нужен. Он не задействован нигде.
+
+root@epddc3ia5726tb0gb0tt:/etc/nginx/sites-enabled# cd ../sites-available/
+root@epddc3ia5726tb0gb0tt:/etc/nginx/sites-available# pwd
+/etc/nginx/sites-available
+root@epddc3ia5726tb0gb0tt:/etc/nginx/sites-available# ll
+total 16
+drwxr-xr-x 2 root root 4096 Jun  3 07:29 ./
+drwxr-xr-x 8 root root 4096 Jun  3 06:35 ../
+-rw-r--r-- 1 root root 2416 Mar 26  2020 default
+-rw-r--r-- 1 root root 1004 Jun  3 07:29 nip
+root@epddc3ia5726tb0gb0tt:/etc/nginx/sites-available# cat default 
+##
+# You should look at the following URL's in order to grasp a solid understanding
+# of Nginx configuration files in order to fully unleash the power of Nginx.
+# https://www.nginx.com/resources/wiki/start/
+# https://www.nginx.com/resources/wiki/start/topics/tutorials/config_pitfalls/
+# https://wiki.debian.org/Nginx/DirectoryStructure
+#
+# In most cases, administrators will remove this file from sites-enabled/ and
+# leave it as reference inside of sites-available where it will continue to be
+# updated by the nginx packaging team.
+#
+# This file will automatically load configuration files provided by other
+# applications, such as Drupal or Wordpress. These applications will be made
+# available underneath a path with that package name, such as /drupal8.
+#
+# Please see /usr/share/doc/nginx-doc/examples/ for more detailed examples.
+##
+
+# Default server configuration
+#
+server {
+	listen 80 default_server;
+	listen [::]:80 default_server;
+
+	# SSL configuration
+	#
+	# listen 443 ssl default_server;
+	# listen [::]:443 ssl default_server;
+	#
+	# Note: You should disable gzip for SSL traffic.
+	# See: https://bugs.debian.org/773332
+	#
+	# Read up on ssl_ciphers to ensure a secure configuration.
+	# See: https://bugs.debian.org/765782
+	#
+	# Self signed certs generated by the ssl-cert package
+	# Don't use them in a production server!
+	#
+	# include snippets/snakeoil.conf;
+
+	root /var/www/html;
+
+	# Add index.php to the list if you are using PHP
+	index index.html index.htm index.nginx-debian.html;
+
+	server_name _;
+
+	location / {
+		# First attempt to serve request as file, then
+		# as directory, then fall back to displaying a 404.
+		try_files $uri $uri/ =404;
+	}
+
+	# pass PHP scripts to FastCGI server
+	#
+	#location ~ \.php$ {
+	#	include snippets/fastcgi-php.conf;
+	#
+	#	# With php-fpm (or other unix sockets):
+	#	fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;
+	#	# With php-cgi (or other tcp sockets):
+	#	fastcgi_pass 127.0.0.1:9000;
+	#}
+
+	# deny access to .htaccess files, if Apache's document root
+	# concurs with nginx's one
+	#
+	#location ~ /\.ht {
+	#	deny all;
+	#}
+}
+
+
+# Virtual Host configuration for example.com
+#
+# You can move that to a different file under sites-available/ and symlink that
+# to sites-enabled/ to enable it.
+#
+#server {
+#	listen 80;
+#	listen [::]:80;
+#
+#	server_name example.com;
+#
+#	root /var/www/example.com;
+#	index index.html;
+#
+#	location / {
+#		try_files $uri $uri/ =404;
+#	}
+#}
+root@epddc3ia5726tb0gb0tt:/etc/nginx/sites-available# 
+
+
+
+# Содержимое файла .htpasswd
+root@epddc3ia5726tb0gb0tt:/etc/nginx# cat .htpasswd 
+rebrain:$apr1$Ruhz.2xn$dPB/GmJZkQ2wFf70oOWos/
+root@epddc3ia5726tb0gb0tt:/etc/nginx# 
+
+
+root@epddc3ia5726tb0gb0tt:/etc/nginx/modules-enabled# ll
+total 24
+drwxr-xr-x 2 root root 4096 Jun  3 06:02 ./
+drwxr-xr-x 8 root root 4096 Jun  3 06:35 ../
+lrwxrwxrwx 1 root root   57 Jun  3 06:02 50-mod-http-auth-pam.conf -> /usr/share/nginx/modules-available/mod-http-auth-pam.conf
+lrwxrwxrwx 1 root root   56 Jun  3 06:02 50-mod-http-dav-ext.conf -> /usr/share/nginx/modules-available/mod-http-dav-ext.conf
+lrwxrwxrwx 1 root root   53 Jun  3 06:02 50-mod-http-echo.conf -> /usr/share/nginx/modules-available/mod-http-echo.conf
+lrwxrwxrwx 1 root root   55 Jun  3 06:02 50-mod-http-geoip2.conf -> /usr/share/nginx/modules-available/mod-http-geoip2.conf
+lrwxrwxrwx 1 root root   54 Jun  3 06:02 50-mod-http-geoip.conf -> /usr/share/nginx/modules-available/mod-http-geoip.conf
+lrwxrwxrwx 1 root root   61 Jun  3 06:02 50-mod-http-image-filter.conf -> /usr/share/nginx/modules-available/mod-http-image-filter.conf
+lrwxrwxrwx 1 root root   60 Jun  3 06:02 50-mod-http-subs-filter.conf -> /usr/share/nginx/modules-available/mod-http-subs-filter.conf
+lrwxrwxrwx 1 root root   62 Jun  3 06:02 50-mod-http-upstream-fair.conf -> /usr/share/nginx/modules-available/mod-http-upstream-fair.conf
+lrwxrwxrwx 1 root root   60 Jun  3 06:02 50-mod-http-xslt-filter.conf -> /usr/share/nginx/modules-available/mod-http-xslt-filter.conf
+lrwxrwxrwx 1 root root   48 Jun  3 06:02 50-mod-mail.conf -> /usr/share/nginx/modules-available/mod-mail.conf
+lrwxrwxrwx 1 root root   50 Jun  3 06:02 50-mod-stream.conf -> /usr/share/nginx/modules-available/mod-stream.conf
+root@epddc3ia5726tb0gb0tt:/etc/nginx/modules-enabled# 
+
+
+****************************************************************************************
+Теория
+****************************************************************************************
+LNXA-01 02: Web. nginx. Proxy, access
+Описание:
+В этом задании мы продолжим свое знакомство с nginx, погрузившись в возможности ограничения доступа к страницам и использования данного веб-сервера в роли обратного прокси-сервера для запросов.
+
+allow/deny
+Часто возникает случай, когда требуется ограничить доступ к конкретному ресурсу на уровне IP-адресов. Для этого в nginx есть директивы allow/deny, которые принимают в качестве аргумента адрес или сеть, которым нужно разрешить или запретить доступ, либо служебное слово all, которое позволяет применить правило ко всем возможным хостам. По умолчаниию же nginx разрешает доступ со всех адресов. Разберем пример распространенной конфигурации:
+
+    allow 127.0.0.1;
+    allow 10.0.0.0/8;
+    deny all;
+Данный пример делает 3 вещи - разрешает доступ с адреса 127.0.0.1 (сам сервер) и из частной сети 10.0.0.0/8, а всем остальным доступ запрещает. Как мы уже говорили в блоке про директиву include, последовательность директив в nginx важна, поэтому, если в вашем конфигурационном файле первой идет директива deny all, то все остальные директивы allow не будут иметь должного эффекта.
+
+allow и deny, казалось бы, можно использовать как своеобразный firewall по ограничению доступа к вашим ресурсам, однако, в отличие от Firewall, nginx при подключении все равно производит установку соединения, то есть открывает TCP-соединение, что требует ресурсов.
+
+client_max_body_size
+Данная директива определяет, данные какого объема клиент может отправлять на сервер. С этой директивой на практике приходится часто встречаться при работе с приложениями, которые принимают файлы - к примеру, изображения или документы.
+
+Аргументом данной директивы выступает число в мегабайтах или килобайтах с приставками m или k, соответственно, либо без приставки (в этом случае размер тела устанавливается в байтах). Примеры валидных значений:
+
+128m
+4096k
+1024
+0
+Последнее значение является специальным, которое отключает проверку на размер тела, но, как правило, лучше использовать какой-то лимит, чтобы в nginx не отправляли гигантские файлы, с которыми он может не справиться.
+
+basic auth
+Кроме ограничения доступа к ресурсу по IP-адресу, другим более распространенным случаем использования является добавление средств авторизации. Простейшим вариантом является метод basic auth, заключающийся в доступе к ресурсу по паре пользователь-пароль. В nginx данный модуль реализован набором директив из модуля ngx_http_auth_basic_module:
+
+auth_basic - позволяет либо отключить аутентификацию (для этого используется специальное значение off), либо задать текст, который выводится при входе на страницу (к примеру, "Welcome to Area 52");
+auth_basic_user_file - определяет путь, где хранится файл с данными для входа.
+Для работы модуля требуется указывать обе директивы.
+
+Остановимся на второй директиве поподробнее:
+
+Имя данного файла может быть либо относительное (от директории, в которой хранится основной конфигурационный файл nginx - к примеру, htpasswd приведет на /etc/nginx/htpasswd), либо абсолютное.
+Содержимое файла должно быть в формате Apache2 htpasswd.
+Разберем последний формат:
+
+$USERNAME:$PASSWORD_WITH_HASH_TYPE
+
+Если с именем пользователя все понятно, то со вторым полем, пожалуй, сложнее. Логично, что в файле не очень хочется хранить пароль в открытом виде (хотя можно и так, но об этом позже). Для решения этой проблемы используется хешированный пароль.
+
+Обычно для генерации такого файла используется утилита htpasswd, которая в составе Ubuntu поставляется в пакете apache2-utils. Ее использование выглядит следующим образом:
+
+htpasswd -c /etc/nginx/htpasswd $USERNAME - данная команда создаст (за это отвечает ключ -c) новый файл и запишет в него пароль, который запросит в интерактивном режиме утилита для пользователя с ником $USERNAME.
+
+Если же требуется добавить новую запись в уже существующий файл, то можно сделать это, вызвав htpasswd /etc/nginx/htpasswd $USERNAME_NEW.
+
+По умолчанию утилита htpasswd использует MD5 для хеширования, но при помощи различных ключей можно изменить алгоритм.
+
+Единственная проблема с этим подходом в том, что для использования этой команды требуется ставить дополнительный пакет для работы на сервере, хотя, по факту, эта утилита просто генерирует текстовый файл с хешами, который можно переносить. Да, конечно, можно установить эту утилиту у себя на компьютере и генерировать такие файлы не на сервере, после чего просто записать данные в файл на сервере. Но бывает необходимо сделать это именно на сервере либо может быть по каким-то причинам полный отказ устанавливать утилиты для Apache2 - мы же с nginx работаем.
+
+Для этого можно использовать другую утилиту - openssl, которая позволяет делать большое количество криптографических операций, в том числе сгенерировать хеш для пароля. Ввиду ее широкого распространения, она есть из коробки практически в любом современном дистрибутиве Linux. Для этого можно воспользоваться следующей командой и получить такой же результат, как и при работе htpasswd:
+
+echo "sammy:$(openssl passwd -apr1)" >> /etc/nginx/htpasswd
+
+Равно как и с htpasswd, пароль для команды будет запрошен в интерактивном режиме и в файл будет добавлена новая запись - не важно, существовал файл ранее или нет.
+
+Кроме использования хешей, можно записывать пароль в нехешированном виде. Для этого используется формат из RFC-2307, который позволяет описать формат хеширования в фигурных скобках. Так, для хранения пароля в открытом виде используется следующий формат:
+
+test:{PLAIN}test
+
+В рамках этой директивы необходимо рассказать про такое свойство, как наследование значений. Если вы устанавливаете директиву, скажем, в main, то она будет применена для всех директив ниже ее по иерархии, то есть во всех http, server и далее. Если же вам требуется переопределить конкретную директиву, то вы можете для этого задать ее в блоке ниже. На примере - если вам нужно переопределить, куда нужно писать error_log для конкретного server, хотя у вас уже определено это в main, то вам просто нужно добавить директиву access_log внутрь server.
+
+return
+Директива return может быть знакома тем людям, которые программируют в той или иной степени на любом языке программирования. Там, как правило, она возвращает результат выполнения функции, в nginx же данная директива либо возвращает какой-то текст (может использоваться для отладки), либо делает редирект на другую ссылку (при использовании HTTP кодов из семейства 300-х).
+
+Синтаксис директивы следующий - return HTTP_CODE TEXT/URL.
+
+Примеры использования:
+
+return 200 "hello from nginx"; - вернет соответствующий текст с кодом 200;
+return 301 http://example.com - вызовет redirect с кодом 301 на соответствующую ссылку.
+Частый кейс использования - автоматический перевод пользователя с www поддомена или перевод на HTTPS версию сайта. Особенно популярный кейс - редирект всех доменов по умолчанию на HTTPS - return 301 https://$host$request_uri;.
+
+proxy_pass
+Теперь мы добрались до директивы, которая отвечает за важную функцию nginx - проксирование запросов на сторонние сервисы. Для этого существует два семейства команд - proxy_pass и fastcgi_pass, которые отвечают за разные модули. Однако вторая директива используется исключительно в связке с FastCGI сервером, что является, в общем-то, более частным случаем, чем proxy_pass, поэтому мы будем разбирать только ее.
+
+Эта директива позволяет переслать запрос, пришедший на nginx, на другой сервис. Это может использоваться в случаях проброса внешних запросов за сервис в частной сети. В связке с другими возможностями nginx (терминирование SSL трафика, быстрая отдача статики и возможность иметь одну точку входа для многих приложений, basic auth и allow/deny) мы получаем отличное решение, которое способно снять часть задач с самого приложения при помощи стабильного инструмента.
+
+Пример использования директивы - proxy_pass http://127.0.0.1:9000;.
+
+Как не трудно догадаться, данная директива отправит все входящие запросы, приходящие в server, на локальный порт 9000 (часто занимаемый PHP-FPM, но об этом мы поговорим в одном из следующих заданий).
+
+Однако использование этой директивы самой по себе не представляет такого интереса, поскольку приложению часто требуется передавать и другие данные запроса, например, заголовки.
+
+Манипулирование заголовками
+Nginx, кроме перенаправления трафика, умеет еще и управлять HTTP заголовками разными путями. Это бывает полезно как для передачи дополнительных сервисных данных для сервиса, так и для клиента.
+
+В nginx существует несколько основных директив, которые позволяют взаимодействовать с заголовками:
+
+add_header - позволяет добавить заголовок с необходимым значением, которое будет возвращаться клиенту. Пример использования - возвращение сервисных заголовков, которые могут отвечать за корректную работу определенной функциональности в браузерах, такую как Cross-Origin Resource Sharing, позволяющей сервисам из одного домена обращаться к сервисам в другом домене. Пример использования директивы - add_header X-Example RebrainMe;. Для того чтобы удалить заголовок из ответа, можно просто установить его пустым, передав пустую строку ("").
+proxy_set_header - позволяет задать заголовок, который будет передан через proxy_pass. Пример использования - proxy_set_header Host $proxy_host;.
+proxy_hide_header - позоволяет скрыть конкретный заголовок, который передал сервер клиенту обратно. Пример - proxy_hide_header Content-Secure-Policy;.
+Во всех этих директивах можно использовать переменные, ровно как и обычные строки и даже строить другие строки из переменных. К примеру, add_header X-Forwarded-For $host;.
+
+upstream
+В случае, когда у вас есть несколько инстансов приложения, вы можете использовать директиву upstream ( точнее, блок), чтобы собрать несколько адресов, к которым нужно направлять трафик. И в этом случае nginx будет проксировать запросы между серверами по определенному алгоритму балансировки. Данную директиву можно использовать только в блоке http. В том же http.server она работать не будет.
+
+Разберем пример использования директивы:
+
+upstream backend {
+    server 127.0.0.1:8080;
+    server 127.0.0.1:8081 backup;
+}
+При такой настройке запросы будут циклически пробрасываться между двумя сервисами по алгоритму балансировки round-robin. У поддиректории server есть большое количество возможных параметров, которые определяют логику работы. В примере как раз приведен один из параметров. Разберем основные возможные параметры:
+
+backup - отмечает сервер как запасной. Суть данной директивы в том, что на backup server запросы отправляются только тогда, когда основной сервер не отвечает.
+weight - позволяет задать для сервера вес, то есть то, какую долю запросов может обрабатывать сервер, изменяя алгоритм балансировки на weighted round-robin. Процент отправляемых сообщений можно посчитать, просуммировав количество всех весов и разделив на это значение вес конкретного сервера. По умолчанию это значение равняется 1. Пример использования - server 127.0.0.1:8080 weigh=3;. Если в данном случае у нас есть второй сервер без веса и без директивы backup, то на первый сервер у нас будет идти 75% трафика, а на второй - 25%.
+max_conns - ограничивает количество одновременных подключений к серверу. Значение 0 снимает ограничение, и это значение выставлено по умолчанию. Пример использования - server 127.0.0.1:8081 max_conns=10 backup;.
+max_fails - определяет, через сколько неуспешных отправленных запросов данный сервер отмечается как проблемный и временно отключается из балансировки на период, указанный в другой директиве - fail_timeout.
+Кроме директивы server, в upstream есть свой набор директив, которые, к примеру, определяют другие алгоритмы балансировки, но в рамках данного задания мы их рассматривать не будем и оставим на ваше личное рассмотрение.
+
+Существуют и другие директивы, которые позволяют, к примеру, проверять, доступны ли сервера даже без нагрузки, чтобы не потерять запросы, но они, увы, не идут в стандартном пакете nginx, а распространяются как внешний модуль.
+
+А теперь к главному - как использовать upstream? Для этого нужно передавать имя upstream в директиву proxy_pass:
+
+proxy_pass http://backend;
+
+Важно обратить внимание на то, что протокол, по которому производится обращение к серверам, определяется именно на уровне proxy_pass, а не upstream.server.
+
+Пока мы использовали только IP-адреса в роли upstream.server и в proxy_pass. Связано это с тем, что по умолчанию nginx не производит DNS-запросов, поэтому использование https://example.com приведет к ошибке. Для того чтобы иметь возможность все-таки использовать DNS-имена, используют директиву resolver с передачей DNS-сервера, который должен использоваться для DNS-запросов. Пример использования - resolver 1.1.1.1;.
+
+Теперь, когда мы познакомились с основными директивами, вернемся к утверждению, что каждая директива может быть использована только там, где она разрешена. Так, к примеру, директива location может быть использована только внутри блока server, но, по контрасту, директива access_log может быть использована на любом уровне, начиная с http, а директива error_log, поскольку она не привязана ни к одному протоколу, может быть использована на каждом уровне, начиная с main.
+
+Полезные ссылки:
+nginx (archlinux wiki rus)
+Restricting Access with HTTP Basic Authentication
+How To Set Up Password Authentication with Nginx
+does nginx auth_basic send the password plaintext?
+Настройка proxy_pass в nginx
+Adding and removing nginx response headers
+CORS on Nginx
+Алгоритм выбора location в Nginx (habr)
+
