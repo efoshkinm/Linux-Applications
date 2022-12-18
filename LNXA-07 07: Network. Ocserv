@@ -1,0 +1,456 @@
+Задание:
+Установить сервер и настроить сертификаты от Let's Encrypt.
+Настроить сервер для работы клиентов.
+Проверить подключение к серверу, убедиться, что сервер работает.
+Предоставить логин, пароль и URL для подключения сервера с целью проверки.
+Проверка будет осуществляться путем подключения клиента и проверки доступности интернет-ресурсов.
+
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+25.10.2022 09:32
+1. Установка
+
+address: 130.193.55.17
+dnf install ocserv
+
+dnf install firewalld
+sudo firewall-cmd --permanent --add-port=443/tcp
+sudo firewall-cmd --permanent --add-port=443/udp
+# for lets encrypt
+sudo firewall-cmd --permanent --add-port=80/tcp
+sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="10.10.10.0/24" masquerade'
+sudo systemctl reload firewalld
+
+### Boost kernel
+echo "net.ipv4.ip_forward = 1" | sudo tee /etc/sysctl.d/60-custom.conf
+echo "net.core.default_qdisc=fq" | sudo tee -a /etc/sysctl.d/60-custom.conf
+echo "net.ipv4.tcp_congestion_control=bbr" | sudo tee -a /etc/sysctl.d/60-custom.conf
+sudo sysctl -p /etc/sysctl.d/60-custom.conf
+
+# Installing lets encrypt
+sudo dnf install certbot
+$ certbot --version
+certbot 1.30.0
+
+sudo certbot certonly --standalone --preferred-challenges http --agree-tos --email m.efoshkin@yandex.ru -d 130.193.55.17.nip.io
+Certificate is saved at: /etc/letsencrypt/live/130.193.55.17.nip.io/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/130.193.55.17.nip.io/privkey.pem
+This certificate expires on 2023-01-23.
+
+### OCserv configuration
+[root@epdh7l2gfvn38ijj8vv6 ocserv]# cat ocserv.conf | grep -v -e '^#' -e '^$'
+auth = "plain[passwd=/etc/ocserv/ocpasswd]"
+tcp-port = 443
+udp-port = 443
+run-as-user = ocserv
+run-as-group = ocserv
+socket-file = ocserv.sock
+chroot-dir = /var/lib/ocserv
+server-cert = /etc/letsencrypt/live/130.193.55.17.nip.io/fullchain.pem
+server-key = /etc/letsencrypt/live/130.193.55.17.nip.io/privkey.pem
+isolate-workers = true
+max-clients = 16
+max-same-clients = 2
+rate-limit-ms = 100
+server-stats-reset-time = 604800
+keepalive = 30
+dpd = 90
+mobile-dpd = 1800
+switch-to-tcp-timeout = 25
+try-mtu-discovery = true
+cert-user-oid = 0.9.2342.19200300.100.1.1
+compression = true
+tls-priorities = "NORMAL:%SERVER_PRECEDENCE"
+auth-timeout = 240
+idle-timeout = 1200
+mobile-idle-timeout = 2400
+min-reauth-time = 300
+max-ban-score = 80
+ban-reset-time = 1200
+cookie-timeout = 300
+deny-roaming = false
+rekey-time = 172800
+rekey-method = ssl
+use-occtl = true
+pid-file = /var/run/ocserv.pid
+device = vpns
+predictable-ips = true
+default-domain = 130.193.55.17.nip.io
+ipv4-network = 10.10.10.0
+ipv4-netmask = 255.255.255.0
+ipv6-network = fda9:4efe:7e3b:03ea::/48 
+ipv6-subnet-prefix = 64
+tunnel-all-dns = true
+dns = 8.8.8.8
+dns = 1.1.1.1
+ping-leases = false
+route = default
+no-route = 192.168.5.0/255.255.255.0
+cisco-client-compat = true
+dtls-legacy = true
+
+### Создание пользователей
+sudo ocpasswd -c /etc/ocserv/ocpasswd rebrainme
+PAssword: RebrainMe
+
+systemctl enable --now ocserv
+Проверка
+Локально
+
+sudo dnf install epel-release
+sudo dnf install openconnect
+
+sudo openconnect -b 130.193.55.17.nip.io
+
+
+### Помогло это
+https://www.linuxbabe.com/redhat/openconnect-vpn-server-ocserv-centos-8
+
+
+Выдает такую ошибку
+
+[m.efoshkin@localhost ~]$ sudo openconnect -u rebrain -p RebrainMe -b  130.193.55.17.nip.io 
+POST https://130.193.55.17.nip.io/
+Connected to 130.193.55.17:443
+SSL negotiation with 130.193.55.17.nip.io
+SSL connection failure: The TLS connection was non-properly terminated.
+Failed to open HTTPS connection to 130.193.55.17.nip.io
+Failed to complete authentication
+[m.efoshkin@localhost ~]$ 
+траблшутинг
+[root@epdh7l2gfvn38ijj8vv6 ocserv]# systemctl stop ocserv
+[root@epdh7l2gfvn38ijj8vv6 ocserv]# sudo /usr/sbin/ocserv --foreground --pid-file /run/ocserv.pid --config /etc/ocserv/ocserv.conf --debug=10
+note: skipping 'pid-file' config option
+note: vhost:default: setting 'plain' as primary authentication method
+note: setting 'file' as supplemental config option
+listening (TCP) on 0.0.0.0:443...
+listening (TCP) on [::]:443...
+listening (UDP) on 0.0.0.0:443...
+listening (UDP) on [::]:443...
+ocserv[2539]: main: Starting 1 instances of ocserv-sm
+ocserv[2539]: main: created sec-mod socket file (ocserv.sock.2a2c3a66.0)
+ocserv[2539]: main: not using control unix socket
+ocserv[2539]: main: initialized ocserv 1.1.3
+ocserv[2540]: sec-mod: reading supplemental config from files
+ocserv[2540]: TLS[<3>]: ASSERT: attributes.c[_x509_parse_attribute]:103
+ocserv[2540]: TLS[<3>]: ASSERT: attributes.c[_x509_parse_attribute]:174
+ocserv[2540]: sec-mod: loaded 1 keys
+ocserv[2540]: sec-mod: sec-mod initialized (socket: /var/lib/ocserv/ocserv.sock.2a2c3a66.0)
+ocserv[2539]: main: added 1 points (total 1) for IP '213.24.126.147' to ban list
+ocserv[2539]: main: queue_length retval:0 rqueue:0 wqueue:0
+note: skipping 'pid-file' config option
+note: vhost:default: setting 'plain' as primary authentication method
+ocserv[2540]: sec-mod: received request from pid 2541 and uid 0
+ocserv[2540]: sec-mod: cmd [size=57] sm: sign
+ocserv[2540]: TLS[<3>]: ASSERT: mpi.c[wrap_nettle_mpi_print]:60
+note: setting 'file' as supplemental config option
+ocserv[2541]: worker: 213.24.126.147 accepted connection
+ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: Allocating epoch #0
+ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: Allocating epoch #1
+ocserv[2541]: TLS[<3>]: ASSERT: buffers.c[get_last_packet]:1185
+ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: SSL 3.3 Handshake packet received. Epoch 0, length: 512
+ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: Expected Packet Handshake(22)
+ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: Received Packet Handshake(22) with length: 512
+ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: Decrypted Packet[0] Handshake(22) with length: 512
+ocserv[2541]: TLS[<4>]: HSK[0x560831689e30]: CLIENT HELLO (1) was received. Length 508[508], frag offset 0, frag length: 508, sequence: 0
+ocserv[2541]: TLS[<4>]: HSK[0x560831689e30]: Client's version: 3.3
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Parsing extension 'Supported Versions/43' (5 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Found version: 3.4
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Found version: 3.3
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Negotiated version: 3.4
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Parsing extension 'Safe Renegotiation/65281' (1 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Parsing extension 'Server Name Indication/0' (25 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Parsing extension 'Record Size Limit/28' (2 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: record_size_limit 16385 negotiated
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Ignoring extension 'ClientHello Padding/21'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Parsing extension 'Supported Groups/10' (22 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received group X25519 (0x1d)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received group X448 (0x1e)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received group SECP256R1 (0x17)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received group SECP384R1 (0x18)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received group SECP521R1 (0x19)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received group FFDHE2048 (0x100)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received group FFDHE3072 (0x101)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received group FFDHE4096 (0x102)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received group FFDHE6144 (0x103)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received group FFDHE8192 (0x104)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Selected group SECP256R1
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Parsing extension 'Supported EC Point Formats/11' (2 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Parsing extension 'Signature Algorithms/13' (30 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (4.3) ECDSA-SECP256R1-SHA256
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (5.3) ECDSA-SECP384R1-SHA384
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (6.3) ECDSA-SECP521R1-SHA512
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (8.7) EdDSA-Ed25519
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (8.8) EdDSA-Ed448
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (8.9) RSA-PSS-SHA256
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (8.10) RSA-PSS-SHA384
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (8.11) RSA-PSS-SHA512
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (8.4) RSA-PSS-RSAE-SHA256
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (8.5) RSA-PSS-RSAE-SHA384
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (8.6) RSA-PSS-RSAE-SHA512
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (4.1) RSA-SHA256
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (5.1) RSA-SHA384
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: rcvd signature algo (6.1) RSA-SHA512
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Parsing extension 'Session Ticket/35' (0 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Parsing extension 'PSK Key Exchange Modes/45' (3 bytes)
+ocserv[2541]: TLS[<3>]: ASSERT: psk_ke_modes.c[psk_ke_modes_recv_params]:135
+ocserv[2541]: TLS[<2>]: checking 13.02 (GNUTLS_AES_256_GCM_SHA384) for compatibility
+ocserv[2541]: TLS[<4>]: HSK[0x560831689e30]: Requested server name: '130.193.55.17.nip.io'
+ocserv[2541]: TLS[<4>]: checking cert compat with ECDSA-SECP256R1-SHA256
+ocserv[2541]: TLS[<4>]: cannot use privkey of RSA with ECDSA-SECP256R1-SHA256
+ocserv[2541]: TLS[<4>]: checking cert compat with ECDSA-SECP384R1-SHA384
+ocserv[2541]: TLS[<4>]: cannot use privkey of RSA with ECDSA-SECP384R1-SHA384
+ocserv[2541]: TLS[<4>]: checking cert compat with ECDSA-SECP521R1-SHA512
+ocserv[2541]: TLS[<4>]: cannot use privkey of RSA with ECDSA-SECP521R1-SHA512
+ocserv[2541]: TLS[<4>]: checking cert compat with EdDSA-Ed25519
+ocserv[2541]: TLS[<4>]: cannot use privkey of RSA with EdDSA-Ed25519
+ocserv[2541]: TLS[<4>]: checking cert compat with EdDSA-Ed448
+ocserv[2541]: TLS[<4>]: cannot use privkey of RSA with EdDSA-Ed448
+ocserv[2541]: TLS[<4>]: checking cert compat with RSA-PSS-SHA256
+ocserv[2541]: TLS[<4>]: checking cert compat with RSA-PSS-SHA384
+ocserv[2541]: TLS[<4>]: checking cert compat with RSA-PSS-SHA512
+ocserv[2541]: TLS[<4>]: checking cert compat with RSA-PSS-RSAE-SHA256
+ocserv[2541]: TLS[<4>]: Selected signature algorithm: RSA-PSS-RSAE-SHA256
+ocserv[2541]: TLS[<2>]: Selected (RSA) cert based on ciphersuite 13.2: GNUTLS_AES_256_GCM_SHA384
+ocserv[2541]: TLS[<4>]: HSK[0x560831689e30]: Selected cipher suite: GNUTLS_AES_256_GCM_SHA384
+ocserv[2541]: TLS[<4>]: HSK[0x560831689e30]: Selected version TLS1.3
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Parsing extension 'OCSP Status Request/5' (5 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: OCSP status was requested
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Parsing extension 'Key Share/51' (107 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received key share for X25519
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Received key share for SECP256R1
+ocserv[2541]: TLS[<4>]: HSK[0x560831689e30]: Selected group SECP256R1 (2)
+ocserv[2541]: TLS[<3>]: ASSERT: mpi.c[wrap_nettle_mpi_print]:60
+ocserv[2541]: TLS[<3>]: ASSERT: mpi.c[wrap_nettle_mpi_print]:60
+ocserv[2541]: TLS[<2>]: EXT[0x560831689e30]: server generated SECP256R1 shared key
+ocserv[2541]: TLS[<4>]: HSK[0x560831689e30]: Safe renegotiation succeeded
+ocserv[2541]: TLS[<4>]: HSK[0x560831689e30]: SessionID: d510f60315438aadd6d72b246bb7eadb511fb4e3f24f1175fced9cc76b24ef25
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (OCSP Status Request/5) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Client Certificate Type/19) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Server Certificate Type/20) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Supported Groups/10) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Supported EC Point Formats/11) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (SRP/12) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Signature Algorithms/13) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (SRTP/14) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Heartbeat/15) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (ALPN/16) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Encrypt-then-MAC/22) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Extended Master Secret/23) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Session Ticket/35) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Preparing extension (Key Share/51) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: sending key share for SECP256R1
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Sending extension Key Share/51 (69 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Preparing extension (Supported Versions/43) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Sending extension Supported Versions/43 (2 bytes)
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Post Handshake Auth/49) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Safe Renegotiation/65281) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Server Name Indication/0) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Cookie/44) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Early Data/42) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Preparing extension (PSK Key Exchange Modes/45) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Record Size Limit/28) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (Maximum Record Size/1) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Preparing extension (Compress Certificate/27) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Not sending extension (ClientHello Padding/21) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: EXT[0x560831689e30]: Preparing extension (Pre Shared Key/41) for 'TLS 1.3 server hello'
+ocserv[2541]: TLS[<4>]: HSK[0x560831689e30]: SERVER HELLO was queued [155 bytes]
+ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: Preparing Packet Handshake(22) with length: 155 and min pad: 0
+ocserv[2541]: TLS[<9>]: ENC[0x560831689e30]: cipher: NULL, MAC: MAC-NULL, Epoch: 0
+ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: Sent Packet[1] Handshake(22) in epoch 0 and length: 160
+ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: Preparing Packet ChangeCipherSpec(20) with length: 1 and min pad: 0
+ocserv[2541]: TLS[<9>]: ENC[0x560831689e30]: cipher: NULL, MAC: MAC-NULL, Epoch: 0
+ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: Sent Packet[2] ChangeCipherSpec(20) in epoch 0 and length: 6
+ocserv[2541]: TLS[<4>]: REC[0x560831689e30]: Sent ChangeCipherSpec
+ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: Initializing epoch #1
+The futex facility returned an unexpected error code.
+ocserv[2539]: main:213.24.126.147:13442 worker terminated
+ocserv[2539]: main:213.24.126.147:13442 user disconnected (reason: unspecified, rx: 0, tx: 0)
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 4
+25.10.2022 18:27
+Добрый день!
+
+Проверяем:
+
+2022-10-25 18:12:56 | 2c20 | OpenConnect-GUI VPN client (1.5.3) logging started...
+2022-10-25 18:13:18 | 3aec | POST https://130.193.55.17.nip.io/
+2022-10-25 18:13:18 | 3aec | Attempting to connect to server 130.193.55.17:443
+2022-10-25 18:13:18 | 3aec | Connected to 130.193.55.17:443
+2022-10-25 18:13:18 | 3aec | There was a non-CA certificate in the trusted list: C=US,ST=California,L=Newark,O=Logitech Inc,CN=Logitech Inc.
+2022-10-25 18:13:18 | 3aec | There was a non-CA certificate in the trusted list: OU=Copyright (c) 1997 Microsoft Corp.,OU=Microsoft Corporation,CN=Microsoft Root Authority.
+2022-10-25 18:13:18 | 3aec | There was a non-CA certificate in the trusted list: C=US,O=MSFT,CN=Microsoft Authenticode(tm) Root Authority.
+2022-10-25 18:13:18 | 3aec | There was a non-CA certificate in the trusted list: CN=Root Agency.
+2022-10-25 18:13:18 | 3aec | SSL negotiation with 130.193.55.17.nip.io
+2022-10-25 18:13:18 | 3aec | Server certificate verify failed: certificate expired
+2022-10-25 18:13:18 | 3aec | peer is unknown
+2022-10-25 18:13:20 | 3aec | saving peer's public key
+2022-10-25 18:13:20 | 3aec | SSL connection failure: Error in the pull function.
+Сертификаты - ОК, что-то с установкой соединения.
+
+Предположу, что причина вот:
+
+"ocserv[2541]: TLS[<5>]: REC[0x560831689e30]: Initializing epoch #1 The futex facility returned an unexpected error code"
+Нашел несколько отсылок к gnutls, например:
+
+https://src.fedoraproject.org/rpms/ocserv/c/17e5b407a3f0f7f548df4bb45144612290f30fab?branch=rawhide
+Посмотрите в этом направлении. На Ubuntu в этом задании проблем точно не возникало.
+
+26.10.2022 08:58
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+26.10.2022 08:58
+в целом, я попробовал применить настройки к федоре, не не понял где созадть файл ocserv.spec. Через поиск, не нашел.
+
+буду поднимать на убунте
+
+
+address: 158.160.3.198
+
+sudo apt update
+sudo apt install ocserv
+systemctl status ocserv
+sudo ufw allow 80,443/tcp
+sudo apt install certbot
+sudo certbot certonly --standalone --preferred-challenges http --agree-tos --email m.efoshkin@yandex.ru -d 158.160.3.198.nip.io
+/etc/letsencrypt/live/158.160.3.198.nip.io/fullchain.pem
+/etc/letsencrypt/live/158.160.3.198.nip.io/privkey.pem
+
+cat ocserv.conf | grep -v -E '^#|^$'
+auth = "plain[passwd=/etc/ocserv/ocpasswd]"
+tcp-port = 443
+run-as-user = nobody
+run-as-group = daemon
+socket-file = /run/ocserv.socket
+server-cert = /etc/letsencrypt/live/158.160.3.198.nip.io/fullchain.pem
+server-key = /etc/letsencrypt/live/158.160.3.198.nip.io/privkey.pem
+ca-cert = /etc/ssl/certs/ssl-cert-snakeoil.pem
+isolate-workers = true
+max-clients = 128
+max-same-clients = 2
+server-stats-reset-time = 604800
+keepalive = 30
+dpd = 60
+mobile-dpd = 300
+switch-to-tcp-timeout = 25
+try-mtu-discovery = true
+cert-user-oid = 0.9.2342.19200300.100.1.1
+compression = true
+no-compress-limit = 256
+tls-priorities = "NORMAL:%SERVER_PRECEDENCE:%COMPAT:-RSA:-VERS-SSL3.0:-ARCFOUR-128"
+auth-timeout = 240
+idle-timeout = 1200
+mobile-idle-timeout = 1800
+min-reauth-time = 300
+max-ban-score = 80
+ban-reset-time = 300
+cookie-timeout = 300
+deny-roaming = false
+rekey-time = 172800
+rekey-method = ssl
+use-occtl = true
+pid-file = /run/ocserv.pid
+device = vpns
+predictable-ips = true
+default-domain = 158.160.3.198.nip.io
+ipv4-network = 10.10.11.0
+ipv4-netmask = 255.255.255.0
+ipv6-network = fda9:4efe:7e3b:03ea::/48 
+tunnel-all-dns = true
+dns = 8.8.8.8
+dns = 1.1.1.1
+ping-leases = false
+cisco-client-compat = true
+dtls-legacy = true
+
+
+sudo systemctl restart ocserv
+
+sudo ocpasswd -c /etc/ocserv/ocpasswd rebrain
+RebrainMe
+echo "net.ipv4.ip_forward = 1" | sudo tee /etc/sysctl.d/60-custom.conf
+echo "net.core.default_qdisc=fq" | sudo tee -a /etc/sysctl.d/60-custom.conf
+echo "net.ipv4.tcp_congestion_control=bbr" | sudo tee -a /etc/sysctl.d/60-custom.conf
+sudo sysctl -p /etc/sysctl.d/60-custom.conf
+
+
+vi /etc/ufw/before.rules
+****************************
+# NAT table rules
+*nat
+:POSTROUTING ACCEPT [0:0]
+-A POSTROUTING -s 10.10.11.0/24 -o eth0 -j MASQUERADE
+
+# allow forwarding for trusted network
+-A ufw-before-forward -s 10.10.11.0/24 -j ACCEPT
+-A ufw-before-forward -d 10.10.11.0/24 -j ACCEPT
+*********************************
+sudo ufw enable
+sudo systemctl restart ufw
+sudo ufw allow 443/tcp
+sudo ufw allow 443/udp
+
+
+Готово!
+Поднял на убунте, все заработало!!!
+Спасибо!
+
+
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+26.10.2022 09:32
+Добрый день!
+
+"в целом, я попробовал применить настройки к федоре, не не понял где созадть файл ocserv.spec. Через поиск, не нашел" - можно было еще selinux выключить совсем, часто проблемы от него, а "готовить" его не всегда просто.
+
+Нужен логин и пароль для проверки, но ОК, проверять не буду отдельно.
+
+Отличные знание темы и выполнение задания, других замечаний и вопросов нет!
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+LNXA-07 07: Network. Ocserv
+Описание:
+Сервер OpenConnect (ocserv) - это сервер SSL VPN для администраторов, которым требуется сложное управление пользователями. Сервер OpenConnect предоставляет пользовательские интерфейсы управления и серверные части, необходимые в корпоративных средах, а также функции безопасности, такие как изоляция подключенных клиентов, то есть функции, которые в настоящее время недоступны для любых существующих серверов VPN. OpenConnect VPN-сервер (ocserv) - это VPN-сервер, совместимый с VPN-клиентом openconnect. Он реализует протокол OpenConnect SSL VPN, а также имеет (в настоящее время экспериментальную) совместимость с клиентами, использующими протокол AnyConnect SSL VPN (Cisco). Начиная с Ubuntu 16.04, OCserv включен в стандартные репозитории Ubuntu.
+
+К ключевым особенностям сервера относят:
+
+совместимость с клиентом Cisco AnyConnect;
+поддержку аутентификации по паролю и сертификату;
+поддержку RADIUS;
+простоту настройки и установки.
+На самом деле, тут не зря упоминают простую настройку, она действительно крайне проста. Чтобы получить работающий сервер, достаточно его установить из репозитория командой apt install ocserv и изменить/настроить в буквальном смысле пару строк в конфигурационном файле /etc/ocserv/ocserv.conf:
+
+auth = "plain[passwd=/etc/ocserv/ocpasswd]"
+dns = 8.8.8.8
+route = default
+Таким образом мы укажем, что для аутентификации у нас будет использоваться локальный файл с паролями, укажем внешний DNS-сервер, который будет отдаваться клиентам и маршрут по умолчанию. Далее нам останется только создать пользователей командой вида:
+
+ocpasswd -c /etc/ocserv/ocpasswd username
+После чего сервер будет готов к работе в минимальной конфигурации. Для клиента же в минимальном варианте достаточно указать пропуск проверки сертификата и выполнить подключение.
+
+Также хотелось бы упомянуть о возможности использовать т.н. split-dns, когда запросы только на определенные домены будут проходить через VPN-сервер. Настраивается это одним параметром в файле конфигурации, вида:
+
+split-dns = example.com
+И еще один немаловажный момент использования ocserv состоит в том, что для шифрования используется обычный TLS, то есть, для всяких систем DPI, часто выполняющих контроль трафика на государственном уровне, пересылаемые пакеты будут выглядеть как обычный HTTPS-трафик, что делает невозможным блокировку в текущих условиях.
+
+Полезные ссылки:
+Openconnect VPN Server
+How to Set up an OpenConnect VPN Server
+Бесплатный аналог AnyConnect VPN Server
+OpenConnect
+
