@@ -1,0 +1,398 @@
+
+Задание:
+Настроить dnsmasq с отдачей локальных имен любого выбранного домена.
+Настроить dnsmasq c dnscrypt-proxy на любой поддерживающий сервис.
+
+
+
+*********************************************************************
+Решение
+**********************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+06.08.2022 13:19
+1. Установка
+address: 84.252.141.166
+apt install dnsmasq
+systemctl stop systemd-resolved
+systemctl start  dnsmasq
+systemctl status  dnsmasq
+
+● dnsmasq.service - dnsmasq - A lightweight DHCP and caching DNS server
+     Loaded: loaded (/lib/systemd/system/dnsmasq.service; enabled; vendor preset: enabled)
+     Active: active (running) since Sat 2022-08-06 08:05:42 UTC; 4s ago
+    Process: 1087 ExecStartPre=/usr/sbin/dnsmasq --test (code=exited, status=0/SUCCESS)
+    Process: 1088 ExecStart=/etc/init.d/dnsmasq systemd-exec (code=exited, status=0/SUCCESS)
+    Process: 1110 ExecStartPost=/etc/init.d/dnsmasq systemd-start-resolvconf (code=exited, status=0/SUCCESS)
+   Main PID: 1109 (dnsmasq)
+      Tasks: 1 (limit: 2310)
+     Memory: 1.0M
+     CGroup: /system.slice/dnsmasq.service
+             └─1109 /usr/sbin/dnsmasq -x /run/dnsmasq/dnsmasq.pid -u dnsmasq -7 /etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new --local-service --trust-anchor=.,20326,8,2,e>
+
+Aug 06 08:05:42 epdvu970qhcp7mjjmqep systemd[1]: Starting dnsmasq - A lightweight DHCP and caching DNS server...
+Aug 06 08:05:42 epdvu970qhcp7mjjmqep dnsmasq[1087]: dnsmasq: syntax check OK.
+Aug 06 08:05:42 epdvu970qhcp7mjjmqep dnsmasq[1109]: started, version 2.80 cachesize 150
+Aug 06 08:05:42 epdvu970qhcp7mjjmqep dnsmasq[1109]: DNS service limited to local subnets
+Aug 06 08:05:42 epdvu970qhcp7mjjmqep dnsmasq[1109]: compile time options: IPv6 GNU-getopt DBus i18n IDN DHCP DHCPv6 no-Lua TFTP conntrack ipset auth nettlehash DNSSEC loo>
+Aug 06 08:05:42 epdvu970qhcp7mjjmqep dnsmasq[1109]: reading /etc/resolv.conf
+Aug 06 08:05:42 epdvu970qhcp7mjjmqep dnsmasq[1109]: using nameserver 127.0.0.53#53
+Aug 06 08:05:42 epdvu970qhcp7mjjmqep dnsmasq[1109]: read /etc/hosts - 5 addresses
+Aug 06 08:05:42 epdvu970qhcp7mjjmqep systemd[1]: Started dnsmasq - A lightweight DHCP and caching DNS server.
+
+2. Настроить dnsmasq с отдачей локальных имен любого выбранного домена.
+vi /etc/dnsmaq.conf
+address=/byui.edu/127.0.0.1
+address=/login.byui.edu/10.10.10.10
+address=/www.byui.edu/80.60.70.90
+
+root@epdvu970qhcp7mjjmqep:/etc# systemctl restart dnsmasq
+root@epdvu970qhcp7mjjmqep:/etc# dig byui.edu @127.0.0.1
+
+; <<>> DiG 9.16.1-Ubuntu <<>> byui.edu @127.0.0.1
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 34787
+;; flags: qr aa rd ra ad; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;byui.edu.			IN	A
+
+;; ANSWER SECTION:
+byui.edu.		0	IN	A	127.0.0.1
+
+;; Query time: 0 msec
+;; SERVER: 127.0.0.1#53(127.0.0.1)
+;; WHEN: Sat Aug 06 08:37:09 UTC 2022
+;; MSG SIZE  rcvd: 53
+
+root@epdvu970qhcp7mjjmqep:/etc# dig login.byui.edu @127.0.0.1
+
+; <<>> DiG 9.16.1-Ubuntu <<>> login.byui.edu @127.0.0.1
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 42923
+;; flags: qr aa rd ra ad; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;login.byui.edu.			IN	A
+
+;; ANSWER SECTION:
+login.byui.edu.		0	IN	A	10.10.10.10
+
+;; Query time: 0 msec
+;; SERVER: 127.0.0.1#53(127.0.0.1)
+;; WHEN: Sat Aug 06 08:37:17 UTC 2022
+;; MSG SIZE  rcvd: 59
+
+root@epdvu970qhcp7mjjmqep:/etc# dig www.byui.edu @127.0.0.1
+
+; <<>> DiG 9.16.1-Ubuntu <<>> www.byui.edu @127.0.0.1
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 30321
+;; flags: qr aa rd ra ad; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;www.byui.edu.			IN	A
+
+;; ANSWER SECTION:
+www.byui.edu.		0	IN	A	80.60.70.90
+
+;; Query time: 0 msec
+;; SERVER: 127.0.0.1#53(127.0.0.1)
+;; WHEN: Sat Aug 06 08:37:33 UTC 2022
+;; MSG SIZE  rcvd: 57
+
+root@epdvu970qhcp7mjjmqep:/etc# 
+
+
+ 
+3. Настроить dnsmasq c dnscrypt-proxy на любой поддерживающий сервис.
+ apt-get install dnscrypt-proxy
+vi /lib/systemd/system/dnscrypt-proxy.socket
+********
+ListenStream=127.0.0.1:5300
+ListenDatagram=127.0.0.1:5300
+********
+
+#Поменял порт сокета иначе не запускается с dnsmasq
+root@epdvu970qhcp7mjjmqep:/etc# cat /lib/systemd/system/dnscrypt-proxy.socket
+******
+[Unit]
+Description=dnscrypt-proxy listening socket
+Documentation=https://github.com/DNSCrypt/dnscrypt-proxy/wiki
+Before=nss-lookup.target
+Wants=nss-lookup.target
+Wants=dnscrypt-proxy-resolvconf.service
+
+[Socket]
+ListenStream=127.0.0.1:5300
+ListenDatagram=127.0.0.1:5300
+NoDelay=true
+DeferAcceptSec=1
+
+[Install]
+WantedBy=sockets.target
+********
+
+
+ТАк же поменял слушающий порт в настройках dnscrypt-proxy
+root@epdvu970qhcp7mjjmqep:/etc# cat dnscrypt-proxy/dnscrypt-proxy.toml 
+*****
+# Empty listen_addresses to use systemd socket activation
+listen_addresses = ['127.0.0.1:5300']
+server_names = ['cloudflare']
+
+[query_log]
+  file = '/var/log/dnscrypt-proxy/query.log'
+
+[nx_log]
+  file = '/var/log/dnscrypt-proxy/nx.log'
+
+[sources]
+  [sources.'public-resolvers']
+  url = 'https://download.dnscrypt.info/resolvers-list/v2/public-resolvers.md'
+  cache_file = '/var/cache/dnscrypt-proxy/public-resolvers.md'
+  minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
+  refresh_delay = 72
+  prefix = ''
+root@epdvu970qhcp7mjjmqep:/etc# 
+******
+
+systemctl daemon-reload
+systemctl restart dnscrypt-proxy.socket
+systemctl restart dnsmasq
+
+Итого:
+root@epdvu970qhcp7mjjmqep:/etc# ss -lntup
+Netid      State       Recv-Q       Send-Q                Local Address:Port             Peer Address:Port      Process                                                                
+udp        UNCONN      0            0                           0.0.0.0:53                    0.0.0.0:*          users:(("dnsmasq",pid=1682,fd=4))                                     
+udp        UNCONN      0            0                  10.129.0.28%eth0:68                    0.0.0.0:*          users:(("systemd-network",pid=450,fd=20))                             
+udp        UNCONN      0            0                         127.0.0.1:5300                  0.0.0.0:*          users:(("dnscrypt-proxy",pid=1638,fd=4),("systemd",pid=1,fd=42))      
+udp        UNCONN      0            0                              [::]:53                       [::]:*          users:(("dnsmasq",pid=1682,fd=6))                                     
+tcp        LISTEN      0            4096                      127.0.0.1:5300                  0.0.0.0:*          users:(("dnscrypt-proxy",pid=1638,fd=3),("systemd",pid=1,fd=38))      
+tcp        LISTEN      0            32                          0.0.0.0:53                    0.0.0.0:*          users:(("dnsmasq",pid=1682,fd=5))                                     
+tcp        LISTEN      0            128                         0.0.0.0:22                    0.0.0.0:*          users:(("sshd",pid=530,fd=3))                                         
+tcp        LISTEN      0            32                             [::]:53                       [::]:*          users:(("dnsmasq",pid=1682,fd=7))                                     
+tcp        LISTEN      0            128                            [::]:22                       [::]:*          users:(("sshd",pid=530,fd=4))                                         
+root@epdvu970qhcp7mjjmqep:/etc# 
+
+Вроде все запущено
+
+ 
+ 
+Проверка
+root@epdvu970qhcp7mjjmqep:/etc# dnscrypt-proxy -resolve byui.edu
+Resolving [byui.edu]
+
+Domain exists:  probably not, or blocked by the proxy
+Canonical name: byui.edu.
+IP addresses:   127.0.0.1
+TXT records:    -
+
+^C
+root@epdvu970qhcp7mjjmqep:/etc# dnscrypt-proxy -resolve login.byui.edu
+Resolving [login.byui.edu]
+
+Domain exists:  probably not, or blocked by the proxy
+Canonical name: login.byui.edu.
+IP addresses:   10.10.10.10
+TXT records:    -
+^C
+root@epdvu970qhcp7mjjmqep:/etc# dnscrypt-proxy -resolve www.byui.edu
+Resolving [www.byui.edu]
+
+Domain exists:  probably not, or blocked by the proxy
+Canonical name: www.byui.edu.
+IP addresses:   80.60.70.90
+TXT records:    -
+^C
+root@epdvu970qhcp7mjjmqep:/etc# dnscrypt-proxy -resolve rebrainme.com
+Resolving [rebrainme.com]
+
+Domain exists:  yes, 2 name servers found
+Canonical name: rebrainme.com.
+IP addresses:   185.206.165.150
+TXT records:    v=spf1 include:_spf.google.com include:mxsspf.sendpulse.com include:mxsmtp.sendpulse.com include:spf.unisender.com include:_spf.yandex.net include:_spf.amocrmmail.com include:spf.letteros.com ~all yandex-verification: 9e066fd2f368e574 google-site-verification=xeMY6R77kmjoOjaPW_aeBNtQcd72Oc8r4VoQKeU8imk yandex-verification: 046d23376a2f5266 google-site-verification=RfNFTppjckppmSQ-E4pMcFO-FjsmHJAtCqZQu7c7Nes mailru-verification: 14c1e4d48208801e
+^C
+root@epdvu970qhcp7mjjmqep:/etc# 
+
+Как видите настройки dnsmasq сохранились.
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 4
+07.08.2022 10:49
+Добрый день!
+
+Очень хорошо, одно уточнение:
+
+"Настроить dnsmasq c dnscrypt-proxy на любой поддерживающий сервис" - как настроили, чтобы dnsmasq отправлял все запросы не напрямую, а через dnscrypt-proxy?
+
+09.08.2022 09:55
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+09.08.2022 09:55
+1. Настройка dnsmasq через dnscrypt-proxy
+Первым делом поменял слушающий порт в /etc/dnsmasq.conf на 127.0.0.1#5300
+cat /etc/dnsmasq.conf
+
+no-resolv
+listen-address=127.0.0.1
+server=127.0.0.1#5300
+
+address=/byui.edu/127.0.0.1
+address=/login.byui.edu/10.10.10.10
+address=/www.byui.edu/80.60.70.90
+
+Поправил resolv.conf для надежности
+cat /etc/resolv.conf
+nameserver 127.0.0.1
+
+Дальше поправил службу dnscrypt-proxy, она не поднималась.
+root@epdvu970qhcp7mjjmqep:/var/log/dnscrypt-proxy# systemctl cat dnscrypt-proxy.service
+# /etc/systemd/system/dnscrypt-proxy.service
+[Unit]
+Description=Encrypted/authenticated DNS proxy
+ConditionFileIsExecutable=/usr/sbin/dnscrypt-proxy
+
+[Service]
+StartLimitInterval=5
+StartLimitBurst=10
+ExecStart=/usr/sbin/dnscrypt-proxy -config /etc/dnscrypt-proxy/dnscrypt-proxy.toml
+WorkingDirectory=/var/log/dnscrypt-proxy
+
+Restart=always
+RestartSec=120
+EnvironmentFile=-/etc/sysconfig/dnscrypt-proxy
+
+[Install]
+WantedBy=multi-user.target
+root@epdvu970qhcp7mjjmqep:/var/log/dnscrypt-proxy# 
+
+
+root@epdvu970qhcp7mjjmqep:/var/log/dnscrypt-proxy# systemctl cat dnscrypt-proxy.socket
+# /lib/systemd/system/dnscrypt-proxy.socket
+[Unit]
+Description=dnscrypt-proxy listening socket
+Documentation=https://github.com/DNSCrypt/dnscrypt-proxy/wiki
+Before=nss-lookup.target
+Wants=nss-lookup.target
+Wants=dnscrypt-proxy-resolvconf.service
+
+[Socket]
+ListenStream=127.0.0.1:5300
+ListenDatagram=127.0.0.1:5300
+NoDelay=true
+DeferAcceptSec=1
+
+[Install]
+WantedBy=sockets.target
+root@epdvu970qhcp7mjjmqep:/var/log/dnscrypt-proxy#
+
+
+
+Помогли эти статьи
+https://wiki.debian.org/dnsmasq
+https://github.com/Victoralm/Install-dnscrypt-proxy-on-Ubuntu-18.04
+
+Проверка
+root@epdvu970qhcp7mjjmqep:/var/log/dnscrypt-proxy# dig rebrainme.com @127.0.0.1 -p 5300
+
+; <<>> DiG 9.16.1-Ubuntu <<>> rebrainme.com @127.0.0.1 -p 5300
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 51004
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;rebrainme.com.			IN	A
+
+;; ANSWER SECTION:
+rebrainme.com.		241	IN	A	185.206.165.150
+
+;; Query time: 56 msec
+;; SERVER: 127.0.0.1#5300(127.0.0.1)
+;; WHEN: Tue Aug 09 06:54:45 UTC 2022
+;; MSG SIZE  rcvd: 71
+
+root@epdvu970qhcp7mjjmqep:/var/log/dnscrypt-proxy# 
+
+root@epdvu970qhcp7mjjmqep:/var/log/dnscrypt-proxy# dig rebrainme.com 
+
+; <<>> DiG 9.16.1-Ubuntu <<>> rebrainme.com
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 12084
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;rebrainme.com.			IN	A
+
+;; ANSWER SECTION:
+rebrainme.com.		213	IN	A	185.206.165.150
+
+;; Query time: 0 msec
+;; SERVER: 127.0.0.1#53(127.0.0.1)
+;; WHEN: Tue Aug 09 06:55:14 UTC 2022
+;; MSG SIZE  rcvd: 58
+
+root@epdvu970qhcp7mjjmqep:/var/log/dnscrypt-proxy# 
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+10.08.2022 00:10
+Добрый день!
+
+server=127.0.0.1#5300
+Все ОК, все запросы будут направляться на прокси, а он уже будет работать дальше.
+
+Отличные знание темы и выполнение задания, замечаний и вопросов нет!
+
+**************************************************************************************
+Теория
+**************************************************************************************
+LNXA-04 04: DNS. dnsmasq
+Описание:
+Заканчивая тему с DNS, рассмотрим еще одну утилиту — dnsmasq, эдакий «швейцарский ножик». Дело в том, что dnsmasq является крайне легковесной утилитой и при этом поддерживает работу сразу нескольких сервисов: DNS и DHCP. Сервис крайне нетребователен к ресурсам, поэтому его часто используют в IoT-девайсах, на маршрутизаторах (скорее всего ваш маршрутизитор ASUS или Huawei использует именно dnsmasq) и других устройствах.
+
+Кроме того, именно dnsmasq обычно используют для настройки загрузки по сети, и это мы увидим в следующем задании, а пока посмотрим простейшую настройку в качестве DNS-сервера.
+
+Устанавливается утилита командой apt install dnsmasq, конфигурационный файл расположен в /etc/dnsmasq.conf. Для того чтобы наш сервер работал обычным рекурсором, нам нужно всего лишь несколько строк в конфигурации:
+
+# Global settings
+domain-needed
+bogus-priv
+no-resolv
+expand-hosts
+filterwin2k
+
+# Upstream nameservers
+server=8.8.4.4
+server=8.8.8.8
+
+listen-address=127.0.0.1
+listen-address=10.1.1.1
+Тем самым мы укажем серверу, на какие интерфейсы привязаться и куда отправлять запросы.
+
+Полезные ссылки:
+Dnsmasq
+dnsmasq ArchWiki
+How to Setup dnsmasq with dnscrypt-proxy and Cloudflare DNS on macOS
+
+
+
