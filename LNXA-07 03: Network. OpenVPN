@@ -1,0 +1,553 @@
+Задание:
+Создайте виртуальную машину в облачном провайдере.
+Выполните установку и настройку OpenVPN со следующими параметрами:
+сервер должен работать на базе сертификатов с DH и TLS-ключом;
+сервер должен запоминать выданные пользователям адреса;
+сервер должен отправлять клиенту настройку маршрутизации для адресов 1.1.1.1 и 8.8.8.8 через него, другие адреса не должны маршрутизироваться через VPN;
+сервер не должен принимать подключения больше, чем от пяти клиентов;
+для аутентификации должен использоваться SHA512;
+для шифрования должен использоваться AES-256;
+TLS должен быть не ниже версии 1.2;
+сервер должен выводить лог работы и статус подключений в текстовые файлы.
+Предоставьте конфигурацию сервера и единый файл .ovpn для клиента.
+Задание будет проверяться путем подключения к вашему серверу с проверкой доступности указанных выше адресов.
+
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+12.10.2022 09:16
+1. Установка
+Server side:
+address: 51.250.97.5
+
+
+dnf install openvpn
+dnf install openvpn-devel
+
+
+CLient side
+address: 158.160.15.25
+dnf install openvpn
+dnf install openvpn-devel
+
+2. Выполните установку и настройку OpenVPN со следующими параметрами:
+
+dnf install easy-rsa
+mkdir /etc/openvpn/easy-rsa
+cp -rai /usr/share/easy-rsa/3/* /etc/openvpn/easy-rsa/
+cd /etc/openvpn/easy-rsa
+./easyrsa clean-all
+./easyrsa init-pki
+./easyrsa build-ca
+rebrainme
+Common Name: RebrainVPN
+./easyrsa build-server-full server nopass
+./easyrsa gen-dh
+openvpn --genkey --secret /etc/openvpn/easy-rsa/pki/ca.key
+cp -rp /etc/openvpn/easy-rsa/pki/{ca.crt,dh.pem,crl.pem,ca.key,issued,private} /etc/openvpn/server/
+vi /etc/openvpn/server/server.conf
+
+**********************************************
+[root@epdgirapfigqedtmfq7s server]# cat server.conf | grep -v -e '^#' -e '^;' -e '^$'
+port 1194
+proto udp
+dev tun
+ca ca.crt
+cert issued/server.crt
+key private/server.key
+dh dh.pem
+crl-verify crl.pem
+tls-auth ca.key 0
+topology subnet
+server 10.8.0.0 255.255.255.0
+ifconfig-pool-persist ipp.txt
+push "route 1.1.1.1 255.255.255.255"
+push "route 8.8.8.8 255.255.255.255"
+keepalive 10 120
+auth SHA512
+cipher AES-256-CBC
+max-clients 5
+user nobody
+group nobody
+persist-key
+persist-tun
+status openvpn-status.log
+log         openvpn.log
+verb 3
+explicit-exit-notify 1
+*****************************************************
+
+systemctl -f enable openvpn-server@server.service
+systemctl restart openvpn-server@server.service
+
+Взято отсюда https://sysadmin.pm/fedora-openvpn/ )
+
+
+Открываем порты на фаерволе и selinux
+
+dnf install iptables-services
+systemctl stop firewalld
+systemctl start iptables
+
+setenforce 0
+getenforce permissive
+
+Включаем форвардинг
+vi /etc/sysctl.conf 
+net.ipv4.ip_forward = 1 
+sysctl -p
+
+
+Создание клиентского сертификата
+cd /etc/openvpn/easy-rsa
+./easyrsa build-client-full client nopass
+cp ca.crt ../../client/
+cp issued/client.crt ../../client/
+cp private/client.key ../../client/
+ll /etc/openvpn/client
+total 20
+-rw-------. 1 root root 1200 Oct 12 04:18 ca.crt
+-rw-------. 1 root root  636 Oct 12 04:31 ca.key
+-rw-------. 1 root root 4486 Oct 12 04:18 client.crt
+-rw-------. 1 root root 1704 Oct 12 04:18 client.key
+
+Копируем сертификаты на клиент
+scp * m.efoshkin@158.160.15.25:~
+
+
+Конфиг на клиенте
+**************************************************
+
+[root@epdofcvkjaq4oci5gb3g client]# cat client.conf | grep -v -e '^#' -e '^;' -e '^$'
+client
+dev tun
+proto udp
+remote  51.250.97.5 1194
+resolv-retry infinite
+nobind
+user nobody
+group nobody
+persist-key
+persist-tun
+ca ca.crt
+cert client.crt
+key client.key
+remote-cert-tls server
+tls-auth ca.key 1
+auth SHA512
+cipher AES-256-CBC
+verb 3
+********************************************************
+
+systemctl enable openvpn-client@client.service
+systemctl start openvpn-client@client.service
+
+[root@epdgirapfigqedtmfq7s yc-user]# ip -br ad
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+eth0             UP             10.129.0.32/24 fe80::d20d:10ff:fe96:d597/64 
+tun0             UNKNOWN        10.8.
+
+
+На клиенте почему то не работает
+[root@epdofcvkjaq4oci5gb3g client]# ip -br ad
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+eth0             UP             10.129.0.41/24 fe80::d20d:18ff:fe7b:3f49/64 
+[root@epdofcvkjaq4oci5gb3g client]# 
+
+.ovpn
+
+*******************************************
+
+
+client
+dev tun
+proto udp
+remote  51.250.97.5 1194
+resolv-retry infinite
+nobind
+user nobody
+group nobody
+persist-key
+persist-tun
+ca ca.crt
+cert client.crt
+key client.key
+tls-auth ca.key 1
+auth SHA512
+cipher AES-256-CBC
+verb 3
+
+
+
+<ca>
+-----BEGIN CERTIFICATE-----
+MIIDSDCCAjCgAwIBAgIUNng4DySgd/cpL6fg3SPcUOtQfbkwDQYJKoZIhvcNAQEL
+BQAwFTETMBEGA1UEAwwKUmVicmFpblZQTjAeFw0yMjEwMTIwMzEzMTlaFw0zMjEw
+MDkwMzEzMTlaMBUxEzARBgNVBAMMClJlYnJhaW5WUE4wggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQCv8bVIo8xVMg7nclnDo/lGx/kEvj7X4hB732riNeHd
+/9wSA4AV8qhP49iLD8LysDgkVWa6DdwSubGX/U0u4JgljGApGRcBv+VqagWnvDsB
+WjiU/1Go16K57LA9LPzWTGMd+ZoC6Oq78JdlQDtaYubYoTIqgTz3x+rgnAZr/kgM
+9HjaR4Ma6URoCIe3j9lRye/O8yLUYztrACCXq9AAwkF8KBVeYCVreOSBppCyfE/r
+IrpcQwZmEUInJPrHGV87UwB7uPIkHwqLi7BZ3jMy0LCLkaoLVeo5uHvwHXZyt+rN
+g+yyuRimgHQgvZWItxaI6ex/rtEfgVCuCUAC7ZAJZNKlAgMBAAGjgY8wgYwwHQYD
+VR0OBBYEFL/QqvluB9VPrUC1rXi4mMB3ciP5MFAGA1UdIwRJMEeAFL/QqvluB9VP
+rUC1rXi4mMB3ciP5oRmkFzAVMRMwEQYDVQQDDApSZWJyYWluVlBOghQ2eDgPJKB3
+9ykvp+DdI9xQ61B9uTAMBgNVHRMEBTADAQH/MAsGA1UdDwQEAwIBBjANBgkqhkiG
+9w0BAQsFAAOCAQEApDD6r2fI26Ux7qF1bumnxxrhP5HxgmTujZLJIcanXla5Kg5l
+n6joI0TASlS3pU1od566n3y/R3L18wuc/2prZtNyy+oOVx773oGSg606pBTva+gt
+dm5xfB0T14tghNys8kYp9KYiRjAEH9aMr5dVgwudM7Cb64vM3OTx+i4BYfomkHNK
+3IrY5ZetMmIO9zKU2Wnr9s1Vj9Fz9J4CrQHAx+aIBacBxtxKauYmROWA1rYNcGNj
+NM4c6A7CGaZswqrjfB3NsRJvysXTnXzom+ZSo0ucjeF2tZUk32u34XoesJbT9p1g
+mxkeOFj/utYPlfzUpvG3PUX2sim7aMflgFqWMQ==
+-----END CERTIFICATE-----
+
+</ca>
+
+<cert>
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            c8:09:0a:d3:4c:7e:d4:69:f5:e5:c3:60:90:a6:50:b0
+        Signature Algorithm: sha256WithRSAEncryption
+        Issuer: CN=RebrainVPN
+        Validity
+            Not Before: Oct 12 04:14:01 2022 GMT
+            Not After : Jan 14 04:14:01 2025 GMT
+        Subject: CN=client
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                RSA Public-Key: (2048 bit)
+                Modulus:
+                    00:d0:3d:44:0c:81:7d:93:7b:69:a5:81:62:34:77:
+                    b8:c7:16:82:5f:75:27:2f:33:37:b2:d3:33:4e:20:
+                    30:4f:63:0a:e2:a9:c4:9d:c4:40:23:06:21:9b:cf:
+                    69:4e:a5:49:73:e1:be:a9:d9:4e:94:b1:c2:9a:ee:
+                    b5:0a:91:43:3f:c9:2f:c0:e0:b9:77:a2:87:f4:85:
+                    4b:9b:f7:ff:35:6d:86:8d:80:0d:88:4c:3e:ca:55:
+                    13:33:47:3a:d1:12:08:03:c8:a5:dd:ca:2d:52:c1:
+                    83:e6:7f:ca:fc:27:5b:54:31:7e:d6:cf:b6:2c:24:
+                    0e:75:9c:35:de:cc:f6:bc:d4:56:2b:d1:bf:97:79:
+                    fe:9e:c2:dc:33:8a:04:68:4e:49:c9:29:c9:6b:0d:
+                    31:0e:46:6e:35:f6:cd:fa:ce:4f:8d:13:3c:39:e4:
+                    59:4e:da:26:18:09:95:c0:a9:1f:6a:24:83:48:10:
+                    eb:f2:67:5c:d4:af:3e:fc:2b:e9:1f:62:67:da:d5:
+                    a4:bd:37:9f:7f:06:f0:e3:69:ce:da:00:5a:92:ad:
+                    50:a9:02:b9:ac:14:7d:44:28:07:24:c7:3f:fc:9a:
+                    87:97:63:8a:26:09:46:2c:38:45:78:fb:ab:4d:1f:
+                    58:e8:29:4c:9d:3b:28:24:9c:80:ad:97:e2:b7:a0:
+                    70:4d
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            X509v3 Subject Key Identifier: 
+                98:CD:D2:E2:E5:64:FF:19:78:3A:7B:94:19:AF:F1:1F:0E:6F:15:2E
+            X509v3 Authority Key Identifier: 
+                keyid:BF:D0:AA:F9:6E:07:D5:4F:AD:40:B5:AD:78:B8:98:C0:77:72:23:F9
+                DirName:/CN=RebrainVPN
+                serial:36:78:38:0F:24:A0:77:F7:29:2F:A7:E0:DD:23:DC:50:EB:50:7D:B9
+
+            X509v3 Extended Key Usage: 
+                TLS Web Client Authentication
+            X509v3 Key Usage: 
+                Digital Signature
+    Signature Algorithm: sha256WithRSAEncryption
+         10:17:4b:5f:37:44:2c:3b:fe:23:66:4c:6b:ec:3d:1c:57:53:
+         fb:88:bd:4e:c1:36:85:88:ce:81:0f:a2:cd:3c:ef:79:95:cc:
+         33:ab:c5:f6:5d:03:7d:62:e2:5c:91:cf:7b:32:e6:7f:75:d8:
+         b1:ef:c3:87:77:dd:a7:a4:29:be:83:ca:38:28:77:33:d7:04:
+         a7:49:d8:e8:bb:43:0f:bc:66:c4:b7:e1:db:e8:2c:e5:c1:38:
+         b8:8f:6a:d6:af:5f:9e:a8:88:63:6c:51:37:4e:33:6c:74:6b:
+         84:08:c1:65:05:54:94:af:9d:d3:3a:75:ea:a9:16:02:cc:db:
+         ae:cc:0b:30:58:81:36:d3:13:8c:6b:bc:89:af:31:20:bd:0f:
+         0a:8f:0c:fe:be:48:90:df:81:56:9a:b0:a2:e6:e6:2d:22:b6:
+         c9:c5:dd:a6:b9:9d:05:0c:e6:c9:4f:b3:af:ec:e3:25:94:f5:
+         bc:10:3c:2f:e5:d3:28:73:28:a9:f0:dd:6b:f7:df:7f:d4:de:
+         9a:20:b2:08:62:52:8f:45:ba:9a:ce:be:7f:f7:ea:df:e2:af:
+         09:ee:73:77:9a:91:d7:a5:23:a3:72:e7:31:f1:b9:08:3b:f0:
+         6a:cb:c6:a2:5d:2b:2e:81:11:9b:7c:b9:b0:e0:ca:65:6a:80:
+         cf:f9:38:f6
+-----BEGIN CERTIFICATE-----
+MIIDUzCCAjugAwIBAgIRAMgJCtNMftRp9eXDYJCmULAwDQYJKoZIhvcNAQELBQAw
+FTETMBEGA1UEAwwKUmVicmFpblZQTjAeFw0yMjEwMTIwNDE0MDFaFw0yNTAxMTQw
+NDE0MDFaMBExDzANBgNVBAMMBmNsaWVudDCCASIwDQYJKoZIhvcNAQEBBQADggEP
+ADCCAQoCggEBANA9RAyBfZN7aaWBYjR3uMcWgl91Jy8zN7LTM04gME9jCuKpxJ3E
+QCMGIZvPaU6lSXPhvqnZTpSxwprutQqRQz/JL8DguXeih/SFS5v3/zVtho2ADYhM
+PspVEzNHOtESCAPIpd3KLVLBg+Z/yvwnW1QxftbPtiwkDnWcNd7M9rzUVivRv5d5
+/p7C3DOKBGhOSckpyWsNMQ5GbjX2zfrOT40TPDnkWU7aJhgJlcCpH2okg0gQ6/Jn
+XNSvPvwr6R9iZ9rVpL03n38G8ONpztoAWpKtUKkCuawUfUQoByTHP/yah5djiiYJ
+Riw4RXj7q00fWOgpTJ07KCScgK2X4regcE0CAwEAAaOBoTCBnjAJBgNVHRMEAjAA
+MB0GA1UdDgQWBBSYzdLi5WT/GXg6e5QZr/EfDm8VLjBQBgNVHSMESTBHgBS/0Kr5
+bgfVT61Ata14uJjAd3Ij+aEZpBcwFTETMBEGA1UEAwwKUmVicmFpblZQToIUNng4
+DySgd/cpL6fg3SPcUOtQfbkwEwYDVR0lBAwwCgYIKwYBBQUHAwIwCwYDVR0PBAQD
+AgeAMA0GCSqGSIb3DQEBCwUAA4IBAQAQF0tfN0QsO/4jZkxr7D0cV1P7iL1OwTaF
+iM6BD6LNPO95lcwzq8X2XQN9YuJckc97MuZ/ddix78OHd92npCm+g8o4KHcz1wSn
+Sdjou0MPvGbEt+Hb6CzlwTi4j2rWr1+eqIhjbFE3TjNsdGuECMFlBVSUr53TOnXq
+qRYCzNuuzAswWIE20xOMa7yJrzEgvQ8Kjwz+vkiQ34FWmrCi5uYtIrbJxd2muZ0F
+DObJT7Ov7OMllPW8EDwv5dMocyip8N1r999/1N6aILIIYlKPRbqazr5/9+rf4q8J
+7nN3mpHXpSOjcucx8bkIO/Bqy8aiXSsugRGbfLmw4MplaoDP+Tj2
+-----END CERTIFICATE-----
+
+</cert>
+
+<key>
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDQPUQMgX2Te2ml
+gWI0d7jHFoJfdScvMzey0zNOIDBPYwriqcSdxEAjBiGbz2lOpUlz4b6p2U6UscKa
+7rUKkUM/yS/A4Ll3oof0hUub9/81bYaNgA2ITD7KVRMzRzrREggDyKXdyi1SwYPm
+f8r8J1tUMX7Wz7YsJA51nDXezPa81FYr0b+Xef6ewtwzigRoTknJKclrDTEORm41
+9s36zk+NEzw55FlO2iYYCZXAqR9qJINIEOvyZ1zUrz78K+kfYmfa1aS9N59/BvDj
+ac7aAFqSrVCpArmsFH1EKAckxz/8moeXY4omCUYsOEV4+6tNH1joKUydOygknICt
+l+K3oHBNAgMBAAECggEAXDZVFOiekBl9XfHeZ/eAFoEsOFMrh+Y5SvHlbTopym3E
+WzzsOSS3dgr4BQQi0NW2oh8cDCCTgJr63xrHhqduzSctA09AMe8CH1CLe8Sk+abH
+h49l7q48u+JSf0mSjRRcAjju4jjuOxBAdWivnVtcQPst/Le8Ju3MjV4gKMpAlLrx
+9T9gQyV4o7xpOSwb36/wOoxRq9n6t1e28koFgG5yr2I7JxKw9qedV7F+PKfNzROY
+i6BRZjK1nveoEmKdHlzl68hdr88m4yVBi0PHxeJesx67z8Okax4LBOpMdRIRz7mx
+ZxPuRa/DaBRGyWvKYeDyVmmZ33X+oARKG60+Jy+mzQKBgQDnDEn0DMdtvq2UU05D
+QgqI8IoJDryY9K72aOJUTYEZ9/qzuSllLSxIXOZNsQb51AXczoLia/rKjHCO9Oln
+sYkiXpJkiI0d1AsK9lULcDckHpx3BqdXNOsiNuH3MI3+Ta1EJz1PY6XX9ym5NzwK
+QFlUM4ogIqEmeLESJRdVjGBfSwKBgQDmumR4c0eTU2b3JeH2jgezByRnFGqTjeCy
+8ntt6g/9Oaozpij2ZUMYKO/NNPkg7gvCNOsVPnEyAG3WKXrgnm1J49azqjN8GV8G
+Ul8/y4qPNTzHwhCvY3EtOeEyjCfD4tFFy50HxHGEYpg69p0B9CROZ0uyO/RhAs8o
+omOnmi/3xwKBgQCS2XavjOe8UvMUURZvHSyA+RFizGEGfo4tw2AG4PPrQ3euf0NW
+MS3yGEmwm5GpfB71xrPdoW/XCQgJdJRc+bQFikJVb4zxpnIWV5aaHIqPhH1CEZKO
+lO3V4zgf2laFiW1U4fPP36/q4gc812Rrx5Z/M/rYjeoK/67br4NzNjOSnQKBgALO
+T3x7gmpTQFRPHKFf9s4BjzrFr8odlpb2hfO/PfSJZ/16ztK4RombrdbkBweUfYYe
+GKHIgZ3nDW7mUD09D/0vDSRgNIIU2Of9xnTDJ+s37YZMYOGRJwYyxv9TXwRt1Lex
+kzZN+Edw34MQDrbAXlSpwuzm98DaROSsnOOj52NvAoGAGvV7NbhVQYcPNKIC+T1p
+H939ZlVoLtCsWYY8Nsy6kTDzbHHTtpwMSCdExAh8t0ezWpWqw6z6ogzi8++dPG6l
+53qNmlHtqWoTyxUnBb7m2OaVPAeo+YVGGu3OG5fQluT0RkqZOujFzp1jGtaMqZwA
++VoC4q1tFCLMK5DfYPJgaTc=
+-----END PRIVATE KEY-----
+
+</key>
+*****************************************************
+
+У меня не получилось подключиться клиентом....
+Oct 12 06:15:38 epdofcvkjaq4oci5gb3g openvpn[1230]: WWWWWTLS Error: TLS key negotiation failed to occur within 60 seconds (check your network connectivity)
+Oct 12 06:15:38 epdofcvkjaq4oci5gb3g openvpn[1230]: TLS Error: TLS handshake failed
+
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+НА ДОРАБОТКЕ 3
+12.10.2022 09:51
+Добрый день!
+
+При попытке импорта профиля (лучше выложить на файлообменник и добавить сюда ссылку, чтобы не было ошибок с копированием, спасибо) получаю ошибку сертификатов:
+
+"Utils: Failed to read file path=C:\Users\ahkhy\Downloads\ca.crt Error: ENOENT: no such file or directory, open 'C:\Users\ahkhy\Downloads\ca.crt'"
+
+Сертификаты включены в ovpn, поэтому не нужно ссылаться на локальные, которых нет на клиенте.
+
+12.10.2022 10:20
+НА ДОРАБОТКЕ 3
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+12.10.2022 10:20
+https://disk.yandex.ru/i/vBYYLlbwtCnKxQ
+
+файл .ovpn
+
+[root@epdgirapfigqedtmfq7s server]# cat ca.crt -----BEGIN CERTIFICATE----- MIIDSDCCAjCgAwIBAgIUNng4DySgd/cpL6fg3SPcUOtQfbkwDQYJKoZIhvcNAQEL BQAwFTETMBEGA1UEAwwKUmVicmFpblZQTjAeFw0yMjEwMTIwMzEzMTlaFw0zMjEw MDkwMzEzMTlaMBUxEzARBgNVBAMMClJlYnJhaW5WUE4wggEiMA0GCSqGSIb3DQEB AQUAA4IBDwAwggEKAoIBAQCv8bVIo8xVMg7nclnDo/lGx/kEvj7X4hB732riNeHd /9wSA4AV8qhP49iLD8LysDgkVWa6DdwSubGX/U0u4JgljGApGRcBv+VqagWnvDsB WjiU/1Go16K57LA9LPzWTGMd+ZoC6Oq78JdlQDtaYubYoTIqgTz3x+rgnAZr/kgM 9HjaR4Ma6URoCIe3j9lRye/O8yLUYztrACCXq9AAwkF8KBVeYCVreOSBppCyfE/r IrpcQwZmEUInJPrHGV87UwB7uPIkHwqLi7BZ3jMy0LCLkaoLVeo5uHvwHXZyt+rN g+yyuRimgHQgvZWItxaI6ex/rtEfgVCuCUAC7ZAJZNKlAgMBAAGjgY8wgYwwHQYD VR0OBBYEFL/QqvluB9VPrUC1rXi4mMB3ciP5MFAGA1UdIwRJMEeAFL/QqvluB9VP rUC1rXi4mMB3ciP5oRmkFzAVMRMwEQYDVQQDDApSZWJyYWluVlBOghQ2eDgPJKB3 9ykvp+DdI9xQ61B9uTAMBgNVHRMEBTADAQH/MAsGA1UdDwQEAwIBBjANBgkqhkiG 9w0BAQsFAAOCAQEApDD6r2fI26Ux7qF1bumnxxrhP5HxgmTujZLJIcanXla5Kg5l n6joI0TASlS3pU1od566n3y/R3L18wuc/2prZtNyy+oOVx773oGSg606pBTva+gt dm5xfB0T14tghNys8kYp9KYiRjAEH9aMr5dVgwudM7Cb64vM3OTx+i4BYfomkHNK 3IrY5ZetMmIO9zKU2Wnr9s1Vj9Fz9J4CrQHAx+aIBacBxtxKauYmROWA1rYNcGNj NM4c6A7CGaZswqrjfB3NsRJvysXTnXzom+ZSo0ucjeF2tZUk32u34XoesJbT9p1g mxkeOFj/utYPlfzUpvG3PUX2sim7aMflgFqWMQ== -----END CERTIFICATE-----
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+НА ДОРАБОТКЕ 3
+13.10.2022 09:39
+Добрый день!
+
+Ожидаю завершения теста с пересозданием сертификатов, если не получится, то напишите в личку, подключусь оперативно и посмотрю!
+
+13.10.2022 22:53
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+13.10.2022 22:53
+Настройки firewalld:
+dnf install firewalld
+
+firewall-cmd --add-service=openvpn
+firewall-cmd --add-interface=tun0 --permanent
+firewall-cmd --add-forward --permanent
+firewall-cmd --add-masquerade --permanent
+firewall-cmd --reload
+firewall-cmd --list-all
+
+dnf install easy-rsa
+mkdir /etc/openvpn/easy-rsa
+cp -rai /usr/share/easy-rsa/3/* /etc/openvpn/easy-rsa/
+cd /etc/openvpn/easy-rsa
+./easyrsa clean-all
+./easyrsa init-pki
+./easyrsa build-ca
+rebrainme
+Common Name: RebrainVPN
+./easyrsa build-server-full server nopass
+./easyrsa gen-dh
+openvpn --genkey --secret /etc/openvpn/easy-rsa/pki/ca.key
+cp -rp /etc/openvpn/easy-rsa/pki/{ca.crt,dh.pem,crl.pem,ca.key,issued,private} /etc/openvpn/server/
+vi /etc/openvpn/server/server.conf
+
+[root@epdgirapfigqedtmfq7s server]#  cat server.conf | grep -v -e '^#' -e '^;' -e '^$' 
+port 1194
+proto udp
+dev tun
+ca ca.crt
+cert server.crt
+key server.key
+dh dh.pem
+auth SHA512
+topology subnet
+server 10.8.0.0 255.255.255.0
+ifconfig-pool-persist ipp.txt
+push "route 1.1.1.1 255.255.255.255"
+push "route 8.8.8.8 255.255.255.255"
+keepalive 10 120
+cipher AES-256-CBC
+max-clients 5
+user nobody
+group nobody
+persist-key
+persist-tun
+status openvpn-status.log
+log         openvpn.log
+verb 3
+explicit-exit-notify 1
+[root@epdgirapfigqedtmfq7s server]# 
+
+Создание клиентского сертификата
+cd /etc/openvpn/easy-rsa
+./easyrsa build-client-full client nopass
+cp ca.crt ../../client/
+cp issued/client.crt ../../client/
+cp private/client.key ../../client/
+ll /etc/openvpn/client
+total 20
+-rw-------. 1 root root 1200 Oct 12 04:18 ca.crt
+-rw-------. 1 root root  636 Oct 12 04:31 ca.key
+-rw-------. 1 root root 4486 Oct 12 04:18 client.crt
+-rw-------. 1 root root 1704 Oct 12 04:18 client.key
+
+Копируем сертификаты на клиент
+scp * m.efoshkin@158.160.15.25:~
+
+
+
+
+client.ovpn
+https://disk.yandex.ru/i/SaIWfrNisx0kBg
+
+Все поправил. Работает.
+[root@epdgirapfigqedtmfq7s yc-user]# ip -br ad
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+eth0             UP             10.129.0.32/24 fe80::d20d:10ff:fe96:d597/64 
+tun0             UNKNOWN        10.8.0.1/24 fe80::9226:bd2f:3045:4f34/64 
+
+[root@epdofcvkjaq4oci5gb3g yc-user]# ip -br ad
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+eth0             UP             10.129.0.41/24 fe80::d20d:18ff:fe7b:3f49/64 
+tun0             UNKNOWN        10.8.0.2/24 fe80::61e7:637c:8c11:89ca/64 
+
+[root@epdofcvkjaq4oci5gb3g yc-user]# systemctl status openvpn-client@client.service
+● openvpn-client@client.service - OpenVPN tunnel for client
+     Loaded: loaded (/usr/lib/systemd/system/openvpn-client@.service; enabled; vendor preset: disabled)
+     Active: active (running) since Thu 2022-10-13 19:23:07 UTC; 30min ago
+       Docs: man:openvpn(8)
+             https://community.openvpn.net/openvpn/wiki/Openvpn24ManPage
+             https://community.openvpn.net/openvpn/wiki/HOWTO
+   Main PID: 15282 (openvpn)
+     Status: "Initialization Sequence Completed"
+      Tasks: 1 (limit: 4619)
+     Memory: 1.0M
+        CPU: 55ms
+     CGroup: /system.slice/system-openvpn\x2dclient.slice/openvpn-client@client.service
+             └─ 15282 /usr/sbin/openvpn --suppress-timestamps --nobind --config client.conf
+
+Oct 13 19:23:07 epdofcvkjaq4oci5gb3g.auto.internal openvpn[15282]: net_route_v4_best_gw result: via 10.129.0.1 dev eth0
+Oct 13 19:23:07 epdofcvkjaq4oci5gb3g.auto.internal openvpn[15282]: ROUTE_GATEWAY 10.129.0.1/255.255.255.0 IFACE=eth0 HWADDR=d0:0d:18:7b:3f:49
+Oct 13 19:23:07 epdofcvkjaq4oci5gb3g.auto.internal openvpn[15282]: TUN/TAP device tun0 opened
+Oct 13 19:23:07 epdofcvkjaq4oci5gb3g.auto.internal openvpn[15282]: net_iface_mtu_set: mtu 1500 for tun0
+Oct 13 19:23:07 epdofcvkjaq4oci5gb3g.auto.internal openvpn[15282]: net_iface_up: set tun0 up
+Oct 13 19:23:07 epdofcvkjaq4oci5gb3g.auto.internal openvpn[15282]: net_addr_v4_add: 10.8.0.2/24 dev tun0
+Oct 13 19:23:07 epdofcvkjaq4oci5gb3g.auto.internal openvpn[15282]: net_route_v4_add: 1.1.1.1/32 via 10.8.0.1 dev [NULL] table 0 metric -1
+Oct 13 19:23:07 epdofcvkjaq4oci5gb3g.auto.internal openvpn[15282]: net_route_v4_add: 8.8.8.8/32 via 10.8.0.1 dev [NULL] table 0 metric -1
+Oct 13 19:23:07 epdofcvkjaq4oci5gb3g.auto.internal openvpn[15282]: WARNING: this configuration may cache passwords in memory -- use the auth-nocache option to prevent this
+Oct 13 19:23:07 epdofcvkjaq4oci5gb3g.auto.internal openvpn[15282]: Initialization Sequence Completed
+[root@epdofcvkjaq4oci5gb3g yc-user]# 
+
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+14.10.2022 10:32
+Добрый день!
+
+Отличные знание темы и выполнение задания, требуемые роуты присутствуют и доступны, замечаний и вопросов нет!
+
+
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+LNXA-07 03: Network. OpenVPN
+Описание:
+OpenVPN - это клиент-серверная VPN-платформа на базе SSL с открытым исходным кодом, которая позволяет настроить VPN-сеть. Виртуальная частная сеть (VPN) может рассматриваться как безопасный туннель, который соединяет два узла через небезопасное соединение (хотя у него есть другие применения, не связанные с безопасностью). OpenVPN использует библиотеку OpenSSL, поэтому он может использовать все возможности, которые присутствуют в этой библиотеке, включая широкий список строгих стандартов шифрования. Фактически самым высоким уровенем шифрования, возможным с OpenVPN, является шифрование 256-бит. Кроме того, OpenVPN может использовать UDP (протокол пользовательских дейтаграмм) или TCP (протокол управления передачей) для передачи данных - при этом UDP является более предпочтительным в плане скорости передачи данных. Также OpenVPN использует свою собственную схему безопасности, основанную на технологиях SSL и TLS, не имея ничего общего с IPsec, L2TP или чем-то подобным. Кроме того, OpenVPN имеет клиента практически под каждую платформу: Linux, Windows, macOS, iOS, Android и т.д. Кроме того, это одно из немногих решений, которое отлично работает не только на третьем (route), но и на втором (bridge) уровне сетевой модели. Также несомненным плюсом является тот факт, что для работы OpenVPN нужен всего один порт, причем можно использовать тот же порт 443, который использует SSL в целом, что и делает этот протокол невосприимчивым к блокировке. Еще одна замечательная особенность заключается в том, что обе конечные точки туннеля могут иметь динамические IP-адреса, что означает, что для работы не нужен статический IP-адрес. Кроме того, по принципу реализации протокол OpenVPN может использовать прокси и без проблем работать через NAT.
+
+Прелесть OVPN заключается в том, что системе можно указать использовать разнообразные методы авторизации. Например, можно настроить двухфакторную авторизацию, используя внешние сервисы, вроде Duo, когда кроме сертификата будет запрошен пароль с токена (генератора одноразовых ключей), причем администратор при этом может получить уведомление и разрешить доступ либо отказать.
+
+Так как OpenVPN основан на сертификатах, то это иногда является «камнем преткновения» в его использовании, особенно когда не очень понятно, как это работает. Решить проблему призван пакет easyrsa, который позволяет очень быстро и просто настроить PKI (центр выдачи сертификатов) для использования их в OpenVPN.
+
+OpenVPN существует в двух вариантах. Платная версия, известная как OpenVPN Access Server, поставляется со специальными функциями, многие из которых являются проприетарными. Мы же будем использовать Community Edition — бесплатный вариант с открытым исходным кодом.
+
+Обычно работа OpenVPN основана на базе сертфикатов с использованием собственного PKI, но мы это решение оставим в качестве задания, а ниже рассмотрим минимальную конфигурацию настройки туннеля между двумя серверами на базе общего ключа.
+
+Сгенерируем общий ключ:
+
+openvpn --genkey --secret static.key
+Скопируем его на обе машины в файл static.key. Один из хостов у нас будет являться сервером, пропишем ему такую конфигурацию:
+
+dev tun
+ifconfig 10.8.0.1 10.8.0.2
+secret static.key
+Здесь мы указываем, что будем использовать устройство tun (третий уровень, режим маршрутизации), назначаем адрес для туннеля, локальный и удаленной машины, а также указываем, где у нас лежит ключ. Для второй машины сделаем похожую конфигурацию, она у нас будет являться клиентом, соответственно, ей нужно будет указать, куда ей подключаться и сделать зеркальную адресацию:
+
+remote openvpn.server.com
+dev tun
+ifconfig 10.8.0.2 10.8.0.1
+secret static.key
+Запустив приложение, мы получим шифрованный туннель между двух хостов. В целом, этого уже достаточно для работы туннеля, но мы чуть расширим конфигурацию, добавив в нее параметры, которые позволят удерживать соединение, если сервер за NAT, а также следить за изменением IP-адреса (так как мы используем подключение по доменному имени). Ну, и в качестве безопасности укажем запуск от непривелигированного пользователя и в режиме демона. То есть, полный конфигурационный файл для сервера будет выглядеть как:
+
+dev tun
+ifconfig 10.8.0.1 10.8.0.2
+secret static.key
+keepalive 10 60
+persist-tun
+persist-key
+user nobody
+group nobody
+daemon
+А для клиента:
+
+remote openvpn.server.com
+dev tun
+ifconfig 10.8.0.2 10.8.0.1
+secret static.key
+keepalive 10 60
+persist-tun
+persist-key
+user nobody
+group nobody
+daemon
+Полезные ссылки:
+OpenVPN How-To
+easy-rsa
+
+
