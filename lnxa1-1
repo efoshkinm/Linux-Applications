@@ -1,3 +1,175 @@
+
+
+
+************************************************************
+Задание:
+Это задание выполняется на виртуальной машине, которую Вы создаете самостоятельно на инфраструктуре Ребрейн. Необходимая информация и инструкции размещены на вкладке "Инфраструктура" (просьба строго соблюдать). Для создания/удаления виртуальной машины Вы можете использовать любой знакомый Вам инструмент (например, Terraform) или утилиту hcloud.
+Пример использования hcloud:
+
+hcloud ssh-key create --name <your_ssh_key_name> --label 'module=linux’ --label 'email=ii_at_rebrainme_com' --public-key-from-file string <path_to_pub_key>
+
+hcloud server create --name <server_name> --type cpx11 --ssh-key <your_ssh_key_name> --label 'module=docker' --label 'email=ii_at_rebrainme_com' --image ubuntu-18.04
+Установите пакет nginx-full.
+Напишите конфигурационный файл nginx, который реализует следующую функциональность:
+Отключен модуль mail.
+В отдельном конфигурационном файле должен быть описан server, который слушает на 80 порту и использует домен, полученный при помощи сервиса http://nip.io/. Например, Ваш публичный адрес 100.101.102.103, тогда один из вариантов имени будет app.100.101.102.103.nip.io. Если этот сервис недоступен, то можно воспользоваться любым аналогичным.
+Используется формат логов с именем logz, который содержит только информацию о том, откуда был произведен запрос, в какое время, какой был произведен запрос и какой HTTP код был возвращен при запросе.
+Логи должны писаться в файл /var/log/nginx/nip.access.log.
+В роли root используется /var/www/html/.
+В роли index - /var/www/html/index.nginx-debian.html, которая должна возвращаться при обращении к /.
+Путь /rbm_images/* должен отдавать файлы из /var/www/rebrain/images/, где должен быть расположен файл http://rebrainme.com/files/logo_rebrain_black.png под именем logo.png.
+В ответе пришлите:
+конфигурационный файл для основного сервера и путь до него;
+список файлов в /etc/nginx/modules-enabled/.
+
+
+*******************************************************************
+
+
+Решение
+*******************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+02.06.2022 11:33
+1. Создание ВМ
+[m.efoshkin@MiWiFi-R4A-srv lnxa]$ yc compute instance create     --name efoshkin-lnxa-01-01     --network-interface subnet-name=default-ru-central1-b,nat-ip-version=ipv4     --zone ru-central1-b     --ssh-key ~/.ssh/id_rsa.pub     --cores 2     --core-fraction 5     --preemptible     --create-boot-disk image-folder-id=standard-images,image-family=ubuntu-2004-lts     --labels user_email=maxefoshkin@gmail.com,task_name=lnxa-01-01
+done (22s)
+id: epdr07go62no20vse38r
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-06-02T07:00:09Z"
+name: efoshkin-lnxa-01-01
+labels:
+  task_name: lnxa-01-01
+  user_email: maxefoshkin@gmail.com
+zone_id: ru-central1-b
+platform_id: standard-v2
+resources:
+  memory: "2147483648"
+  cores: "2"
+  core_fraction: "5"
+status: RUNNING
+boot_disk:
+  mode: READ_WRITE
+  device_name: epdi4040si4ufm1lmekm
+  auto_delete: true
+  disk_id: epdi4040si4ufm1lmekm
+network_interfaces:
+- index: "0"
+  mac_address: d0:0d:1b:01:e1:83
+  subnet_id: e2lebfr9cjkjg4ruk3gn
+  primary_v4_address:
+    address: 10.129.0.42
+    one_to_one_nat:
+      address: 51.250.107.25
+      ip_version: IPV4
+fqdn: epdr07go62no20vse38r.auto.internal
+scheduling_policy:
+  preemptible: true
+network_settings:
+  type: STANDARD
+placement_policy: {}
+
+
+2. Установите пакет nginx-full.
+yc-user@epddesppetsnroe63rb9:~$ sudo apt install nginx-full
+
+3. Напишите конфигурационный файл nginx, который реализует следующую функциональность:
+Всю конфигурацию я добавил в созданный мной файл nip.io :
+
+root@epdmkq32us2av7bua7bs:/etc/nginx/sites-enabled# ll
+total 8
+drwxr-xr-x 2 root root 4096 Jun  1 07:09 ./
+drwxr-xr-x 8 root root 4096 Jun  1 07:59 ../
+lrwxrwxrwx 1 root root   25 Jun  1 07:09 nip.io -> ../sites-available/nip.io
+
+
+root@epdr07go62no20vse38r:/var/www/rebrain/images# cat /etc/nginx/sites-available/nip 
+log_format logz '$remote_addr [$time_local]'
+                '"$request" $status';
+
+server {
+       listen 80 default_server;
+       listen [::]:80 default_server;
+
+       access_log /var/log/nginx/nip.access.log logz;
+
+       server_name 51.250.107.25.nip.io;
+
+       root /var/www/html;
+
+#       index index.nginx-debian.html;
+
+       location / {
+		
+  	      index index.nginx-debian.html;
+              try_files  $uri $uri/ =404;
+       }
+
+       location /rbm_images/* {
+      	      alias /var/www/rebrain/images/ ;
+            #  try_files $uri $uri/ *;
+	      autoindex on;
+
+       }
+}
+
+
+ 
+
+
+
+root@epdmkq32us2av7bua7bs:/etc/nginx# cd modules-enabled/
+root@epdmkq32us2av7bua7bs:/etc/nginx/modules-enabled# ll
+total 24
+drwxr-xr-x 2 root root 4096 Jun  1 06:33 ./
+drwxr-xr-x 8 root root 4096 Jun  1 07:59 ../
+lrwxrwxrwx 1 root root   57 Jun  1 06:33 50-mod-http-auth-pam.conf -> /usr/share/nginx/modules-available/mod-http-auth-pam.conf
+lrwxrwxrwx 1 root root   56 Jun  1 06:33 50-mod-http-dav-ext.conf -> /usr/share/nginx/modules-available/mod-http-dav-ext.conf
+lrwxrwxrwx 1 root root   53 Jun  1 06:33 50-mod-http-echo.conf -> /usr/share/nginx/modules-available/mod-http-echo.conf
+lrwxrwxrwx 1 root root   55 Jun  1 06:33 50-mod-http-geoip2.conf -> /usr/share/nginx/modules-available/mod-http-geoip2.conf
+lrwxrwxrwx 1 root root   54 Jun  1 06:33 50-mod-http-geoip.conf -> /usr/share/nginx/modules-available/mod-http-geoip.conf
+lrwxrwxrwx 1 root root   61 Jun  1 06:33 50-mod-http-image-filter.conf -> /usr/share/nginx/modules-available/mod-http-image-filter.conf
+lrwxrwxrwx 1 root root   60 Jun  1 06:33 50-mod-http-subs-filter.conf -> /usr/share/nginx/modules-available/mod-http-subs-filter.conf
+lrwxrwxrwx 1 root root   62 Jun  1 06:33 50-mod-http-upstream-fair.conf -> /usr/share/nginx/modules-available/mod-http-upstream-fair.conf
+lrwxrwxrwx 1 root root   60 Jun  1 06:33 50-mod-http-xslt-filter.conf -> /usr/share/nginx/modules-available/mod-http-xslt-filter.conf
+lrwxrwxrwx 1 root root   48 Jun  1 06:33 50-mod-mail.conf -> /usr/share/nginx/modules-available/mod-mail.conf
+lrwxrwxrwx 1 root root   50 Jun  1 06:33 50-mod-stream.conf -> /usr/share/nginx/modules-available/mod-stream.conf
+root@epdmkq32us2av7bua7bs:/etc/nginx/modules-enabled# 
+
+
+#Скачайный файл лого
+root@epdr07go62no20vse38r:/var/www# mkdir -p rebrain/images
+root@epdr07go62no20vse38r:/var/www# cd rebrain/images/
+root@epdr07go62no20vse38r:/var/www/rebrain/images# wget http://rebrainme.com/files/logo_rebrain_black.png logo.png
+--2022-06-02 07:08:04--  http://rebrainme.com/files/logo_rebrain_black.png
+Resolving rebrainme.com (rebrainme.com)... 185.206.165.150
+Connecting to rebrainme.com (rebrainme.com)|185.206.165.150|:80... connected.
+HTTP request sent, awaiting response... 301 Moved Permanently
+Location: https://rebrainme.com/files/logo_rebrain_black.png [following]
+--2022-06-02 07:08:04--  https://rebrainme.com/files/logo_rebrain_black.png
+Connecting to rebrainme.com (rebrainme.com)|185.206.165.150|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 15581 (15K) [image/png]
+Saving to: ‘logo_rebrain_black.png’
+
+logo_rebrain_black.png              100%[=================================================================>]  15.22K  --.-KB/s    in 0s      
+
+2022-06-02 07:08:04 (267 MB/s) - ‘logo_rebrain_black.png’ saved [15581/15581]
+
+--2022-06-02 07:08:04--  http://logo.png/
+Resolving logo.png (logo.png)... failed: Name or service not known.
+wget: unable to resolve host address ‘logo.png’
+FINISHED --2022-06-02 07:08:04--
+Total wall clock time: 0.04s
+Downloaded: 1 files, 15K in 0s (267 MB/s)
+root@epdr07go62no20vse38r:/var/www/rebrain/images# mv logo_rebrain_black.png logo.png
+
+РАботает.
+
+
+****************************************************************************
+Теория
+****************************************************************************
 LNXA-01 01: Web. nginx. Basics
 Описание:
 Интернет - это глобальная сеть, через которую можно получить огромное количество данных, начиная от видеопотока с вашими друзьям и родственниками, заканчивая корпоративными данными с вашего места работы. Наиболее распространенным окном в Интернет является браузер, через который отрисовывывается вся эта информация. Однако если то, как пользоваться браузером, сейчас понятно почти каждому, то какое приложение отдает нам контент из интернета - более широкая тема. В рамках этого и последующих блоков мы будем разбирать инфраструктурные компоненты один за одним, чтобы у вас сформировалось как понимание, так и опыт работы с ними.
@@ -315,171 +487,5 @@ Nginx alias vs root directives. Nginx serves static files. Trailing slash in pat
 
 
 
-
-
-************************************************************
-Задание:
-Это задание выполняется на виртуальной машине, которую Вы создаете самостоятельно на инфраструктуре Ребрейн. Необходимая информация и инструкции размещены на вкладке "Инфраструктура" (просьба строго соблюдать). Для создания/удаления виртуальной машины Вы можете использовать любой знакомый Вам инструмент (например, Terraform) или утилиту hcloud.
-Пример использования hcloud:
-
-hcloud ssh-key create --name <your_ssh_key_name> --label 'module=linux’ --label 'email=ii_at_rebrainme_com' --public-key-from-file string <path_to_pub_key>
-
-hcloud server create --name <server_name> --type cpx11 --ssh-key <your_ssh_key_name> --label 'module=docker' --label 'email=ii_at_rebrainme_com' --image ubuntu-18.04
-Установите пакет nginx-full.
-Напишите конфигурационный файл nginx, который реализует следующую функциональность:
-Отключен модуль mail.
-В отдельном конфигурационном файле должен быть описан server, который слушает на 80 порту и использует домен, полученный при помощи сервиса http://nip.io/. Например, Ваш публичный адрес 100.101.102.103, тогда один из вариантов имени будет app.100.101.102.103.nip.io. Если этот сервис недоступен, то можно воспользоваться любым аналогичным.
-Используется формат логов с именем logz, который содержит только информацию о том, откуда был произведен запрос, в какое время, какой был произведен запрос и какой HTTP код был возвращен при запросе.
-Логи должны писаться в файл /var/log/nginx/nip.access.log.
-В роли root используется /var/www/html/.
-В роли index - /var/www/html/index.nginx-debian.html, которая должна возвращаться при обращении к /.
-Путь /rbm_images/* должен отдавать файлы из /var/www/rebrain/images/, где должен быть расположен файл http://rebrainme.com/files/logo_rebrain_black.png под именем logo.png.
-В ответе пришлите:
-конфигурационный файл для основного сервера и путь до него;
-список файлов в /etc/nginx/modules-enabled/.
-
-
-*******************************************************************
-
-
-Решение
-*******************************************************************
-Ефошкин Максим Вячеславович
-ОТПРАВЛЕНО
-02.06.2022 11:33
-1. Создание ВМ
-[m.efoshkin@MiWiFi-R4A-srv lnxa]$ yc compute instance create     --name efoshkin-lnxa-01-01     --network-interface subnet-name=default-ru-central1-b,nat-ip-version=ipv4     --zone ru-central1-b     --ssh-key ~/.ssh/id_rsa.pub     --cores 2     --core-fraction 5     --preemptible     --create-boot-disk image-folder-id=standard-images,image-family=ubuntu-2004-lts     --labels user_email=maxefoshkin@gmail.com,task_name=lnxa-01-01
-done (22s)
-id: epdr07go62no20vse38r
-folder_id: b1gu2vqv4hil3okf70bb
-created_at: "2022-06-02T07:00:09Z"
-name: efoshkin-lnxa-01-01
-labels:
-  task_name: lnxa-01-01
-  user_email: maxefoshkin@gmail.com
-zone_id: ru-central1-b
-platform_id: standard-v2
-resources:
-  memory: "2147483648"
-  cores: "2"
-  core_fraction: "5"
-status: RUNNING
-boot_disk:
-  mode: READ_WRITE
-  device_name: epdi4040si4ufm1lmekm
-  auto_delete: true
-  disk_id: epdi4040si4ufm1lmekm
-network_interfaces:
-- index: "0"
-  mac_address: d0:0d:1b:01:e1:83
-  subnet_id: e2lebfr9cjkjg4ruk3gn
-  primary_v4_address:
-    address: 10.129.0.42
-    one_to_one_nat:
-      address: 51.250.107.25
-      ip_version: IPV4
-fqdn: epdr07go62no20vse38r.auto.internal
-scheduling_policy:
-  preemptible: true
-network_settings:
-  type: STANDARD
-placement_policy: {}
-
-
-2. Установите пакет nginx-full.
-yc-user@epddesppetsnroe63rb9:~$ sudo apt install nginx-full
-
-3. Напишите конфигурационный файл nginx, который реализует следующую функциональность:
-Всю конфигурацию я добавил в созданный мной файл nip.io :
-
-root@epdmkq32us2av7bua7bs:/etc/nginx/sites-enabled# ll
-total 8
-drwxr-xr-x 2 root root 4096 Jun  1 07:09 ./
-drwxr-xr-x 8 root root 4096 Jun  1 07:59 ../
-lrwxrwxrwx 1 root root   25 Jun  1 07:09 nip.io -> ../sites-available/nip.io
-
-
-root@epdr07go62no20vse38r:/var/www/rebrain/images# cat /etc/nginx/sites-available/nip 
-log_format logz '$remote_addr [$time_local]'
-                '"$request" $status';
-
-server {
-       listen 80 default_server;
-       listen [::]:80 default_server;
-
-       access_log /var/log/nginx/nip.access.log logz;
-
-       server_name 51.250.107.25.nip.io;
-
-       root /var/www/html;
-
-#       index index.nginx-debian.html;
-
-       location / {
-		
-  	      index index.nginx-debian.html;
-              try_files  $uri $uri/ =404;
-       }
-
-       location /rbm_images/* {
-      	      alias /var/www/rebrain/images/ ;
-            #  try_files $uri $uri/ *;
-	      autoindex on;
-
-       }
-}
-
-
- 
-
-
-
-root@epdmkq32us2av7bua7bs:/etc/nginx# cd modules-enabled/
-root@epdmkq32us2av7bua7bs:/etc/nginx/modules-enabled# ll
-total 24
-drwxr-xr-x 2 root root 4096 Jun  1 06:33 ./
-drwxr-xr-x 8 root root 4096 Jun  1 07:59 ../
-lrwxrwxrwx 1 root root   57 Jun  1 06:33 50-mod-http-auth-pam.conf -> /usr/share/nginx/modules-available/mod-http-auth-pam.conf
-lrwxrwxrwx 1 root root   56 Jun  1 06:33 50-mod-http-dav-ext.conf -> /usr/share/nginx/modules-available/mod-http-dav-ext.conf
-lrwxrwxrwx 1 root root   53 Jun  1 06:33 50-mod-http-echo.conf -> /usr/share/nginx/modules-available/mod-http-echo.conf
-lrwxrwxrwx 1 root root   55 Jun  1 06:33 50-mod-http-geoip2.conf -> /usr/share/nginx/modules-available/mod-http-geoip2.conf
-lrwxrwxrwx 1 root root   54 Jun  1 06:33 50-mod-http-geoip.conf -> /usr/share/nginx/modules-available/mod-http-geoip.conf
-lrwxrwxrwx 1 root root   61 Jun  1 06:33 50-mod-http-image-filter.conf -> /usr/share/nginx/modules-available/mod-http-image-filter.conf
-lrwxrwxrwx 1 root root   60 Jun  1 06:33 50-mod-http-subs-filter.conf -> /usr/share/nginx/modules-available/mod-http-subs-filter.conf
-lrwxrwxrwx 1 root root   62 Jun  1 06:33 50-mod-http-upstream-fair.conf -> /usr/share/nginx/modules-available/mod-http-upstream-fair.conf
-lrwxrwxrwx 1 root root   60 Jun  1 06:33 50-mod-http-xslt-filter.conf -> /usr/share/nginx/modules-available/mod-http-xslt-filter.conf
-lrwxrwxrwx 1 root root   48 Jun  1 06:33 50-mod-mail.conf -> /usr/share/nginx/modules-available/mod-mail.conf
-lrwxrwxrwx 1 root root   50 Jun  1 06:33 50-mod-stream.conf -> /usr/share/nginx/modules-available/mod-stream.conf
-root@epdmkq32us2av7bua7bs:/etc/nginx/modules-enabled# 
-
-
-#Скачайный файл лого
-root@epdr07go62no20vse38r:/var/www# mkdir -p rebrain/images
-root@epdr07go62no20vse38r:/var/www# cd rebrain/images/
-root@epdr07go62no20vse38r:/var/www/rebrain/images# wget http://rebrainme.com/files/logo_rebrain_black.png logo.png
---2022-06-02 07:08:04--  http://rebrainme.com/files/logo_rebrain_black.png
-Resolving rebrainme.com (rebrainme.com)... 185.206.165.150
-Connecting to rebrainme.com (rebrainme.com)|185.206.165.150|:80... connected.
-HTTP request sent, awaiting response... 301 Moved Permanently
-Location: https://rebrainme.com/files/logo_rebrain_black.png [following]
---2022-06-02 07:08:04--  https://rebrainme.com/files/logo_rebrain_black.png
-Connecting to rebrainme.com (rebrainme.com)|185.206.165.150|:443... connected.
-HTTP request sent, awaiting response... 200 OK
-Length: 15581 (15K) [image/png]
-Saving to: ‘logo_rebrain_black.png’
-
-logo_rebrain_black.png              100%[=================================================================>]  15.22K  --.-KB/s    in 0s      
-
-2022-06-02 07:08:04 (267 MB/s) - ‘logo_rebrain_black.png’ saved [15581/15581]
-
---2022-06-02 07:08:04--  http://logo.png/
-Resolving logo.png (logo.png)... failed: Name or service not known.
-wget: unable to resolve host address ‘logo.png’
-FINISHED --2022-06-02 07:08:04--
-Total wall clock time: 0.04s
-Downloaded: 1 files, 15K in 0s (267 MB/s)
-root@epdr07go62no20vse38r:/var/www/rebrain/images# mv logo_rebrain_black.png logo.png
-
-РАботает.
 
 
