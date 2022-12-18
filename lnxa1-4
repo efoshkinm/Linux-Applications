@@ -1,0 +1,695 @@
+Задание:
+Установите apache веб-сервер на вашем сервере (отправьте команду для установки).
+Напишите конфигурационный файл apache2, который реализует следующую функциональность:
+Должен быть реализован конфиг для обработки запросов по умолчанию, описанный в лекции.
+В отдельном конфигурационном файле должен быть описан server, который слушает на 8080 порту и использует домен, полученный при помощи сервиса http://nip.io/. Например, Ваш публичный адрес 100.101.102.103, тогда один из вариантов имени будет app.100.101.102.103.nip.io. Если этот сервис недоступен, то можно воспользоваться любым аналогичным.
+Используется формат логов с именем logz, который содержит только информацию о том, откуда был произведен запрос, в какое время, какой был произведен запрос и какой HTTP код был возвращен при запросе.
+Логи должны писаться в файл `/var/log/apache2/nip.access.log.
+Разрешены обращения со всех хостов, кроме 10.10.10.10.
+Для всех путей используется basic auth с пользователем rebrain и паролем linux, кроме /noauth/*.
+В роли root используется /var/www/html/.
+В роли index - /var/www/html/index.nginx-debian.html, которая должна возвращаться при обращении к /.
+Путь /rbm_images/* должен отдавать файлы из /var/www/rebrain/images/, в котором должен быть расположен файл http://rebrainme.com/files/logo_rebrain_black.png под именем logo.png.
+Запрос на /example/ должен проксироваться на https://example.com/, обращение к которому производится через балансировщик нагрузки (по аналогии с upstream в Nginx).
+В ответе пришлите:
+Конфигурационный файл сервера по умолчанию и путь до него
+Конфигурационный файл для основного сервера и путь до него
+Список файлов в /etc/apache2/mods-enabled/
+Содержимое файла, используемого для basic auth
+
+*********************************************************************************
+Решение
+*********************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+16.06.2022 16:17
+Создание VM.
+[m.efoshkin@fedora ~]$ yc compute instance create     --name efoshkin-lnxa-01-04     --network-interface subnet-name=default-ru-central1-b,nat-ip-version=ipv4     --zone ru-central1-b     --ssh-key ~/.ssh/id_rsa.pub     --cores 2     --core-fraction 5     --preemptible     --create-boot-disk image-folder-id=standard-images,image-family=ubuntu-2004-lts     --labels user_email=maxefoshkin@gmail.com,task_name=lnxa-01-04
+done (21s)
+id: epdu9utgjb9bck3pionr
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-06-16T05:36:31Z"
+name: efoshkin-lnxa-01-04
+labels:
+  task_name: lnxa-01-04
+  user_email: maxefoshkin@gmail.com
+zone_id: ru-central1-b
+platform_id: standard-v2
+resources:
+  memory: "2147483648"
+  cores: "2"
+  core_fraction: "5"
+status: RUNNING
+boot_disk:
+  mode: READ_WRITE
+  device_name: epdln3pqcofqagal0btr
+  auto_delete: true
+  disk_id: epdln3pqcofqagal0btr
+network_interfaces:
+- index: "0"
+  mac_address: d0:0d:1e:4f:bb:09
+  subnet_id: e2lebfr9cjkjg4ruk3gn
+  primary_v4_address:
+    address: 10.129.0.9
+    one_to_one_nat:
+      address: 51.250.111.213
+      ip_version: IPV4
+fqdn: epdu9utgjb9bck3pionr.auto.internal
+scheduling_policy:
+  preemptible: true
+network_settings:
+  type: STANDARD
+placement_policy: {}
+
+[m.efoshkin@fedora ~]$ 
+
+Установка apache2.
+apt install apache2
+
+root@epdl5dngfsut28771vjb:/etc/apache2# ll
+total 88
+drwxr-xr-x  8 root root  4096 Jun 11 11:09 ./
+drwxr-xr-x 80 root root  4096 Jun 11 11:10 ../
+-rw-r--r--  1 root root  7224 Apr 26 18:02 apache2.conf
+drwxr-xr-x  2 root root  4096 Jun 11 11:09 conf-available/
+drwxr-xr-x  2 root root  4096 Jun 11 11:09 conf-enabled/
+-rw-r--r--  1 root root  1782 Feb 23  2021 envvars
+-rw-r--r--  1 root root 31063 Feb 23  2021 magic
+drwxr-xr-x  2 root root 12288 Jun 11 11:09 mods-available/
+drwxr-xr-x  2 root root  4096 Jun 11 11:09 mods-enabled/
+-rw-r--r--  1 root root   320 Feb 23  2021 ports.conf
+drwxr-xr-x  2 root root  4096 Jun 11 11:09 sites-available/
+drwxr-xr-x  2 root root  4096 Jun 11 11:09 sites-enabled/
+
+Настройки
+logz
+root@epdu9utgjb9bck3pionr:/etc/apache2# cat /var/log/apache2/nip.access.log 
+51.250.111.213 [16/Jun/2022:06:36:44 +0000] "GET / HTTP/1.1" 200 
+51.250.111.213 [16/Jun/2022:06:37:26 +0000] "GET / HTTP/1.1" 200 
+51.250.111.213 [16/Jun/2022:06:37:58 +0000] "GET / HTTP/1.1" 200 
+
+Пробовал заблокировать доступ для своего компьютера 79.120.71.242. Работает. 
+root@epdu9utgjb9bck3pionr:/etc/apache2# cat /var/log/apache2/nip.access.log | grep 403
+79.120.71.242 [16/Jun/2022:07:32:12 +0000] "GET / HTTP/1.1" 403 
+79.120.71.242 [16/Jun/2022:07:33:49 +0000] "GET / HTTP/1.1" 403 
+root@epdu9utgjb9bck3pionr:/etc/apache2# 
+
+
+root@epdu9utgjb9bck3pionr:/etc/apache2# htpasswd -c .htpasswd rebrain
+New password: 
+Re-type new password: 
+Adding password for user rebrain
+root@epdu9utgjb9bck3pionr:/etc/apache2# cat .htpasswd 
+rebrain:$apr1$yldzmWmF$McqHDtOIXUvL4dvfuWObN1
+root@epdu9utgjb9bck3pionr:/etc/apache2# 
+
+
+root@epdu9utgjb9bck3pionr:/var/www# mkdir -p rebrain/images
+root@epdu9utgjb9bck3pionr:/var/www# cd rebrain/images/
+root@epdu9utgjb9bck3pionr:/var/www/rebrain/images# wget http://rebrainme.com/files/logo_rebrain_black.png
+--2022-06-16 09:19:25--  http://rebrainme.com/files/logo_rebrain_black.png
+Resolving rebrainme.com (rebrainme.com)... 185.206.165.150
+Connecting to rebrainme.com (rebrainme.com)|185.206.165.150|:80... connected.
+HTTP request sent, awaiting response... 301 Moved Permanently
+Location: https://rebrainme.com/files/logo_rebrain_black.png [following]
+--2022-06-16 09:19:25--  https://rebrainme.com/files/logo_rebrain_black.png
+Connecting to rebrainme.com (rebrainme.com)|185.206.165.150|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 15581 (15K) [image/png]
+Saving to: ‘logo_rebrain_black.png’
+
+logo_rebrain_black.png                          100%[====================================================================================================>]  15.22K  --.-KB/s    in 0s      
+
+2022-06-16 09:19:25 (387 MB/s) - ‘logo_rebrain_black.png’ saved [15581/15581]
+
+root@epdu9utgjb9bck3pionr:/var/www/rebrain/images# mv logo_rebrain_black.png logo.png
+root@epdu9utgjb9bck3pionr:/var/www/rebrain/images# 
+
+
+root@epdu9utgjb9bck3pionr:/etc/apache2# cat sites-enabled/nip.conf 
+
+LogFormat "%h %t \"%r\" %>s " logz
+
+
+<VirtualHost *:8080>
+       DocumentRoot /var/www/html/
+       ServerName 51.250.111.213.nip.io
+       CustomLog /var/log/apache2/nip.access.log logz
+    <Location />
+        DirectoryIndex index.nginx-debian.html
+        AuthType Basic
+        AuthName "Restricted Content"
+        AuthBasicProvider file
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+        Deny from 10.10.10.10
+    </Location>
+
+    <Location /noauth>
+        DirectoryIndex /var/www/html/index.html
+        Satisfy Any
+        Deny from 10.10.10.10
+    </Location>
+    
+    Alias /rbm_images/ /var/www/rebrain/images/
+    <Location /rbm_images/>
+        AuthType Basic
+        AuthName "Restricted Content"
+        AuthBasicProvider file
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+        Deny from 10.10.10.10
+    </Location>
+    <Proxy "balancer://example.com">
+          BalancerMember "https://example.com:443"
+    </Proxy>
+    Header add Access-Control-Allow-Origin "*"
+    Header add Access-Control-Allow-Headers "origin, x-requested-with, content-type"
+    Header add Access-Control-Allow-Methods "PUT, GET, POST, DELETE, OPTIONS"      
+    ProxyPass  "/example/" "balancer://example.com"
+    ProxyPassReverse "/example/" "balancer://example.com"
+#   <Location /example/>
+#        AuthType Basic
+#        AuthName "Restricted Content"
+#        AuthBasicProvider file
+#        AuthUserFile /etc/apache2/.htpasswd
+#        Require valid-user
+#        Deny from 10.10.10.10
+     #   Header add Set-Cookie "ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/" env=BALANCER_ROUTE_CHANGED
+ 
+#    </Location>
+
+
+</VirtualHost>
+
+
+root@epdu9utgjb9bck3pionr:/etc/apache2# ll mods-enabled/
+total 8
+drwxr-xr-x 2 root root 4096 Jun 16 13:11 ./
+drwxr-xr-x 8 root root 4096 Jun 16 08:39 ../
+lrwxrwxrwx 1 root root   36 Jun 16 05:37 access_compat.load -> ../mods-available/access_compat.load
+lrwxrwxrwx 1 root root   28 Jun 16 05:37 alias.conf -> ../mods-available/alias.conf
+lrwxrwxrwx 1 root root   28 Jun 16 05:37 alias.load -> ../mods-available/alias.load
+lrwxrwxrwx 1 root root   33 Jun 16 05:37 auth_basic.load -> ../mods-available/auth_basic.load
+lrwxrwxrwx 1 root root   33 Jun 16 05:37 authn_core.load -> ../mods-available/authn_core.load
+lrwxrwxrwx 1 root root   33 Jun 16 05:37 authn_file.load -> ../mods-available/authn_file.load
+lrwxrwxrwx 1 root root   33 Jun 16 05:37 authz_core.load -> ../mods-available/authz_core.load
+lrwxrwxrwx 1 root root   33 Jun 16 05:37 authz_host.load -> ../mods-available/authz_host.load
+lrwxrwxrwx 1 root root   33 Jun 16 05:37 authz_user.load -> ../mods-available/authz_user.load
+lrwxrwxrwx 1 root root   32 Jun 16 05:37 autoindex.conf -> ../mods-available/autoindex.conf
+lrwxrwxrwx 1 root root   32 Jun 16 05:37 autoindex.load -> ../mods-available/autoindex.load
+lrwxrwxrwx 1 root root   30 Jun 16 05:37 deflate.conf -> ../mods-available/deflate.conf
+lrwxrwxrwx 1 root root   30 Jun 16 05:37 deflate.load -> ../mods-available/deflate.load
+lrwxrwxrwx 1 root root   26 Jun 16 05:37 dir.conf -> ../mods-available/dir.conf
+lrwxrwxrwx 1 root root   26 Jun 16 05:37 dir.load -> ../mods-available/dir.load
+lrwxrwxrwx 1 root root   26 Jun 16 05:37 env.load -> ../mods-available/env.load
+lrwxrwxrwx 1 root root   29 Jun 16 05:37 filter.load -> ../mods-available/filter.load
+lrwxrwxrwx 1 root root   30 Jun 16 13:11 headers.load -> ../mods-available/headers.load
+lrwxrwxrwx 1 root root   42 Jun 16 12:46 lbmethod_byrequests.load -> ../mods-available/lbmethod_byrequests.load
+lrwxrwxrwx 1 root root   27 Jun 16 05:37 mime.conf -> ../mods-available/mime.conf
+lrwxrwxrwx 1 root root   27 Jun 16 05:37 mime.load -> ../mods-available/mime.load
+lrwxrwxrwx 1 root root   32 Jun 16 05:37 mpm_event.conf -> ../mods-available/mpm_event.conf
+lrwxrwxrwx 1 root root   32 Jun 16 05:37 mpm_event.load -> ../mods-available/mpm_event.load
+lrwxrwxrwx 1 root root   34 Jun 16 05:37 negotiation.conf -> ../mods-available/negotiation.conf
+lrwxrwxrwx 1 root root   34 Jun 16 05:37 negotiation.load -> ../mods-available/negotiation.load
+lrwxrwxrwx 1 root root   37 Jun 16 12:17 proxy_balancer.conf -> ../mods-available/proxy_balancer.conf
+lrwxrwxrwx 1 root root   37 Jun 16 12:17 proxy_balancer.load -> ../mods-available/proxy_balancer.load
+lrwxrwxrwx 1 root root   28 Jun 16 12:15 proxy.conf -> ../mods-available/proxy.conf
+lrwxrwxrwx 1 root root   33 Jun 16 12:17 proxy_http.load -> ../mods-available/proxy_http.load
+lrwxrwxrwx 1 root root   28 Jun 16 12:15 proxy.load -> ../mods-available/proxy.load
+lrwxrwxrwx 1 root root   33 Jun 16 05:37 reqtimeout.conf -> ../mods-available/reqtimeout.conf
+lrwxrwxrwx 1 root root   33 Jun 16 05:37 reqtimeout.load -> ../mods-available/reqtimeout.load
+lrwxrwxrwx 1 root root   31 Jun 16 05:37 setenvif.conf -> ../mods-available/setenvif.conf
+lrwxrwxrwx 1 root root   31 Jun 16 05:37 setenvif.load -> ../mods-available/setenvif.load
+lrwxrwxrwx 1 root root   34 Jun 16 12:17 slotmem_shm.load -> ../mods-available/slotmem_shm.load
+lrwxrwxrwx 1 root root   36 Jun 16 13:09 socache_shmcb.load -> ../mods-available/socache_shmcb.load
+lrwxrwxrwx 1 root root   26 Jun 16 13:09 ssl.conf -> ../mods-available/ssl.conf
+lrwxrwxrwx 1 root root   26 Jun 16 13:09 ssl.load -> ../mods-available/ssl.load
+lrwxrwxrwx 1 root root   29 Jun 16 05:37 status.conf -> ../mods-available/status.conf
+lrwxrwxrwx 1 root root   29 Jun 16 05:37 status.load -> ../mods-available/status.load
+root@epdu9utgjb9bck3pionr:/etc/apache2# 
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+НА ДОРАБОТКЕ 3
+17.06.2022 12:10
+Здравствуйте! К сожалению проверить не смог, https://51.250.111.213.nip.io:8080/example/ - сбрасывает соединение.
+
+18.06.2022 10:48
+ВЫПОЛНЕНО 4
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+18.06.2022 10:48
+[m.efoshkin@fedora ~]$ yc compute instance start efoshkin-lnxa-01-04
+done (17s)
+id: epdu9utgjb9bck3pionr
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-06-16T05:36:31Z"
+name: efoshkin-lnxa-01-04
+labels:
+  task_name: lnxa-01-04
+  user_email: maxefoshkin@gmail.com
+zone_id: ru-central1-b
+platform_id: standard-v2
+resources:
+  memory: "2147483648"
+  cores: "2"
+  core_fraction: "5"
+status: RUNNING
+boot_disk:
+  mode: READ_WRITE
+  device_name: epdln3pqcofqagal0btr
+  auto_delete: true
+  disk_id: epdln3pqcofqagal0btr
+network_interfaces:
+- index: "0"
+  mac_address: d0:0d:1e:4f:bb:09
+  subnet_id: e2lebfr9cjkjg4ruk3gn
+  primary_v4_address:
+    address: 10.129.0.9
+    one_to_one_nat:
+      address: 84.252.137.237
+      ip_version: IPV4
+fqdn: epdu9utgjb9bck3pionr.auto.internal
+scheduling_policy:
+  preemptible: true
+network_settings:
+  type: STANDARD
+placement_policy: {}
+
+There is a new yc version '0.91.0' available. Current version: '0.90.0'.
+See release notes at https://cloud.yandex.ru/docs/cli/release-notes
+You can install it by running the following command in your shell:
+	$ yc components update
+
+[m.efoshkin@fedora ~]$ 
+
+root@epdu9utgjb9bck3pionr:/etc/apache2# cat sites-available/nip.conf 
+
+LogFormat "%h %t \"%r\" %>s " logz
+
+
+<VirtualHost *:8080>
+       DocumentRoot /var/www/html/
+       ServerName 84.252.137.237.nip.io
+       CustomLog /var/log/apache2/nip.access.log logz
+    <Location />
+        DirectoryIndex index.nginx-debian.html
+        AuthType Basic
+        AuthName "Restricted Content"
+        AuthBasicProvider file
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+        Deny from 10.10.10.10
+    </Location>
+
+    <Location /noauth>
+        DirectoryIndex /var/www/html/index.html
+        Satisfy Any
+        Deny from 10.10.10.10
+    </Location>
+    
+    Alias /rbm_images/ /var/www/rebrain/images/
+    <Location /rbm_images/>
+        AuthType Basic
+        AuthName "Restricted Content"
+        AuthBasicProvider file
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+        Deny from 10.10.10.10
+    </Location>
+    <Proxy "balancer://example.com">
+          BalancerMember "https://example.com:443"
+    </Proxy>
+    Header add Access-Control-Allow-Origin "*"
+    Header add Access-Control-Allow-Headers "origin, x-requested-with, content-type"
+    Header add Access-Control-Allow-Methods "PUT, GET, POST, DELETE, OPTIONS"      
+    SSLProxyEngine on
+    ProxyPass  "/example/" "balancer://example.com"
+    ProxyPassReverse "/example/" "balancer://example.com"
+#   <Location /example/>
+#        AuthType Basic
+#        AuthName "Restricted Content"
+#        AuthBasicProvider file
+#        AuthUserFile /etc/apache2/.htpasswd
+#        Require valid-user
+#        Deny from 10.10.10.10
+     #   Header add Set-Cookie "ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/" env=BALANCER_ROUTE_CHANGED
+ 
+#    </Location>
+
+
+</VirtualHost>
+
+Проверка
+
+http://84.252.137.237.nip.io:8080/example/
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 4
+19.06.2022 10:31
+Максим, здравствуйте! Сейчас соединение устанавливается, но вместо страницы с http://example.com/ приходит ошибка 404.
+
+21.06.2022 10:39
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+21.06.2022 10:39
+[m.efoshkin@MiWiFi-R4A-srv ~]$ yc compute instance create     --name efoshkin-lnxa-01-04     --network-interface subnet-name=default-ru-central1-b,nat-ip-version=ipv4     --zone ru-central1-b     --ssh-key ~/.ssh/id_rsa.pub     --cores 2     --core-fraction 5     --preemptible     --create-boot-disk image-folder-id=standard-images,image-family=ubuntu-2004-lts     --labels user_email=maxefoshkin@gmail.com,task_name=lnxa-01-04
+done (25s)
+id: epdoasvufm9jd15c39gj
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-06-21T06:46:26Z"
+name: efoshkin-lnxa-01-04
+labels:
+  task_name: lnxa-01-04
+  user_email: maxefoshkin@gmail.com
+zone_id: ru-central1-b
+platform_id: standard-v2
+resources:
+  memory: "2147483648"
+  cores: "2"
+  core_fraction: "5"
+status: RUNNING
+boot_disk:
+  mode: READ_WRITE
+  device_name: epdaadigg7dlta1hm4dm
+  auto_delete: true
+  disk_id: epdaadigg7dlta1hm4dm
+network_interfaces:
+- index: "0"
+  mac_address: d0:0d:18:57:3f:e7
+  subnet_id: e2lebfr9cjkjg4ruk3gn
+  primary_v4_address:
+    address: 10.129.0.18
+    one_to_one_nat:
+      address: 51.250.100.29
+      ip_version: IPV4
+fqdn: epdoasvufm9jd15c39gj.auto.internal
+scheduling_policy:
+  preemptible: true
+network_settings:
+  type: STANDARD
+placement_policy: {}
+
+
+root@epdoasvufm9jd15c39gj:/etc/apache2/mods-enabled# ll
+total 8
+drwxr-xr-x 2 root root 4096 Jun 21 07:32 ./
+drwxr-xr-x 8 root root 4096 Jun 21 07:30 ../
+lrwxrwxrwx 1 root root   36 Jun 21 06:51 access_compat.load -> ../mods-available/access_compat.load
+lrwxrwxrwx 1 root root   28 Jun 21 06:51 alias.conf -> ../mods-available/alias.conf
+lrwxrwxrwx 1 root root   28 Jun 21 06:51 alias.load -> ../mods-available/alias.load
+lrwxrwxrwx 1 root root   33 Jun 21 06:51 auth_basic.load -> ../mods-available/auth_basic.load
+lrwxrwxrwx 1 root root   33 Jun 21 06:51 authn_core.load -> ../mods-available/authn_core.load
+lrwxrwxrwx 1 root root   33 Jun 21 06:51 authn_file.load -> ../mods-available/authn_file.load
+lrwxrwxrwx 1 root root   33 Jun 21 06:51 authz_core.load -> ../mods-available/authz_core.load
+lrwxrwxrwx 1 root root   33 Jun 21 06:51 authz_host.load -> ../mods-available/authz_host.load
+lrwxrwxrwx 1 root root   33 Jun 21 06:51 authz_user.load -> ../mods-available/authz_user.load
+lrwxrwxrwx 1 root root   32 Jun 21 06:51 autoindex.conf -> ../mods-available/autoindex.conf
+lrwxrwxrwx 1 root root   32 Jun 21 06:51 autoindex.load -> ../mods-available/autoindex.load
+lrwxrwxrwx 1 root root   30 Jun 21 06:51 deflate.conf -> ../mods-available/deflate.conf
+lrwxrwxrwx 1 root root   30 Jun 21 06:51 deflate.load -> ../mods-available/deflate.load
+lrwxrwxrwx 1 root root   26 Jun 21 06:51 dir.conf -> ../mods-available/dir.conf
+lrwxrwxrwx 1 root root   26 Jun 21 06:51 dir.load -> ../mods-available/dir.load
+lrwxrwxrwx 1 root root   26 Jun 21 06:51 env.load -> ../mods-available/env.load
+lrwxrwxrwx 1 root root   29 Jun 21 06:51 filter.load -> ../mods-available/filter.load
+lrwxrwxrwx 1 root root   30 Jun 21 07:25 headers.load -> ../mods-available/headers.load
+lrwxrwxrwx 1 root root   42 Jun 21 07:32 lbmethod_byrequests.load -> ../mods-available/lbmethod_byrequests.load
+lrwxrwxrwx 1 root root   27 Jun 21 06:51 mime.conf -> ../mods-available/mime.conf
+lrwxrwxrwx 1 root root   27 Jun 21 06:51 mime.load -> ../mods-available/mime.load
+lrwxrwxrwx 1 root root   32 Jun 21 06:51 mpm_event.conf -> ../mods-available/mpm_event.conf
+lrwxrwxrwx 1 root root   32 Jun 21 06:51 mpm_event.load -> ../mods-available/mpm_event.load
+lrwxrwxrwx 1 root root   34 Jun 21 06:51 negotiation.conf -> ../mods-available/negotiation.conf
+lrwxrwxrwx 1 root root   34 Jun 21 06:51 negotiation.load -> ../mods-available/negotiation.load
+lrwxrwxrwx 1 root root   37 Jun 21 07:01 proxy_balancer.conf -> ../mods-available/proxy_balancer.conf
+lrwxrwxrwx 1 root root   37 Jun 21 07:01 proxy_balancer.load -> ../mods-available/proxy_balancer.load
+lrwxrwxrwx 1 root root   28 Jun 21 07:01 proxy.conf -> ../mods-available/proxy.conf
+lrwxrwxrwx 1 root root   33 Jun 21 07:29 proxy_http.load -> ../mods-available/proxy_http.load
+lrwxrwxrwx 1 root root   28 Jun 21 07:01 proxy.load -> ../mods-available/proxy.load
+lrwxrwxrwx 1 root root   33 Jun 21 06:51 reqtimeout.conf -> ../mods-available/reqtimeout.conf
+lrwxrwxrwx 1 root root   33 Jun 21 06:51 reqtimeout.load -> ../mods-available/reqtimeout.load
+lrwxrwxrwx 1 root root   31 Jun 21 06:51 setenvif.conf -> ../mods-available/setenvif.conf
+lrwxrwxrwx 1 root root   31 Jun 21 06:51 setenvif.load -> ../mods-available/setenvif.load
+lrwxrwxrwx 1 root root   34 Jun 21 07:01 slotmem_shm.load -> ../mods-available/slotmem_shm.load
+lrwxrwxrwx 1 root root   36 Jun 21 07:26 socache_shmcb.load -> ../mods-available/socache_shmcb.load
+lrwxrwxrwx 1 root root   26 Jun 21 07:26 ssl.conf -> ../mods-available/ssl.conf
+lrwxrwxrwx 1 root root   26 Jun 21 07:26 ssl.load -> ../mods-available/ssl.load
+lrwxrwxrwx 1 root root   29 Jun 21 06:51 status.conf -> ../mods-available/status.conf
+lrwxrwxrwx 1 root root   29 Jun 21 06:51 status.load -> ../mods-available/status.load
+root@epdoasvufm9jd15c39gj:/etc/apache2/mods-enabled# 
+
+
+root@epdoasvufm9jd15c39gj:/etc/apache2/sites-enabled# cat nip.conf 
+LogFormat "%h %t \"%r\" %>s " logz
+
+
+<VirtualHost *:8080>
+       DocumentRoot /var/www/html/
+       ServerName 51.250.100.29.nip.io
+       CustomLog /var/log/apache2/nip.access.log logz
+    <Location />
+        DirectoryIndex index.nginx-debian.html
+        AuthType Basic
+        AuthName "Restricted Content"
+        AuthBasicProvider file
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+        Deny from 10.10.10.10
+    </Location>
+
+    <Location /noauth>
+        DirectoryIndex /var/www/html/index.html
+        Satisfy Any
+        Deny from 10.10.10.10
+    </Location>
+    
+    Alias /rbm_images/ /var/www/rebrain/images/
+    <Location /rbm_images/>
+        AuthType Basic
+        AuthName "Restricted Content"
+        AuthBasicProvider file
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+        Deny from 10.10.10.10
+    </Location>
+    <Proxy "balancer://example.com">
+          BalancerMember "https://example.com:443"
+    </Proxy>
+    Header add Access-Control-Allow-Origin "*"
+    Header add Access-Control-Allow-Headers "origin, x-requested-with, content-type"
+    Header add Access-Control-Allow-Methods "PUT, GET, POST, DELETE, OPTIONS"      
+    SSLProxyEngine on
+    ProxyPass  "/example" "balancer://example.com"
+    ProxyPassReverse "/example" "balancer://example.com"
+#   <Location /example/>
+#        AuthType Basic
+#        AuthName "Restricted Content"
+#        AuthBasicProvider file
+#        AuthUserFile /etc/apache2/.htpasswd
+#        Require valid-user
+#        Deny from 10.10.10.10
+     #   Header add Set-Cookie "ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/" env=BALANCER_ROUTE_CHANGED
+ 
+#    </Location>
+
+
+</VirtualHost>
+root@epdoasvufm9jd15c39gj:/etc/apache2/sites-enabled# 
+
+root@epdoasvufm9jd15c39gj:/etc/apache2# cat .htpasswd 
+rebrain:$apr1$dAQ89mf4$TClLCL.2.eKIZOvpwQEgv1
+root@epdoasvufm9jd15c39gj:/etc/apache2# 
+
+
+
+Проверка
+http://51.250.100.29.nip.io:8080/example/
+
+Все работает
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 5
+21.06.2022 11:24
+Здравствуйте! Замечаний нет, принято.
+
+
+*****************************************************************
+Теория
+*****************************************************************
+LNXA-01 04: Web. Apache
+Описание:
+В продолжение начатой темы мы разберем еще один веб-сервер, который долгое время (до мая 2019 года) был непобедимым в гонке популярности веб-серверов в Интернете, - Apache HTTP Web Server или, как его сейчас чаще принято называть, apache2.
+
+Начнем теорию с краткой исторической справки. Apache HTTP Web server - это один из самых первых веб-серверов, который появился в 1995 году как своеобразный форк от другого веб-сервера httpd, разрабатываемого в Национальном центре суперкомпьютерных приложений (National Center for Supercomputing Applications, NCSA), в ответ на остановку разработки из-за ухода его основного разработчика. В рамках этого "форка" группа администраторов веб-серверов собрали собственные патчи, решающие некоторые имеющиеся актуальные проблемы, и создали новую версию веб-сервера, более стабильное решение, чем вариант NSCA. Но на этом работа не закончилась - начались большие работы по рефакторингу, смене архитектуры сервера и добавлению новых возможностей.
+
+Слово Apache в имени веб-сервера отсылает к одному из известнейших в истории племени коренных индейцев и используется как имя группы, которая начала работу над новым веб-сервером и в дальнейшем переросла в фонд Apache Software Foundation, занимающийся развитием и поддержкой различных программных продуктов, наиболее известным из которых является именно web-сервер.
+
+Двойка, которую часто добавляют в имя веб-сервера, происходит из номера его текущей мажорной версии, в рамках которой и производится развитие вот уже с 2001 года.
+
+В Ubuntu и дистрибутивах, образованных от Debian, пакет, позволяющий установить данный веб-сервер, называется apache2. В других дистрибутивах имя пакета часто отличается. Так, в дистрибутивах семейства RHEL данный пакет называется httpd, в честь имени веб-сервера, с которого все началось и его основного исполняемого файла.
+
+Если раньше apache2 был де-факто самым распространенным веб-сервером из-за того, что он был, в общем-то, единственным адекватным вариантом, то сейчас он наиболее известен в составе так называемого LAMP-стека, который состоит из Linux, Apache, MySQL и PHP (реже - Perl). Именно этот стек широко использовался для создания огромного количества интерактивных сайтов, сайтов-визиток и прочих вещей. Наследие этого стека прослеживается и сейчас в проектах, которые пришли из тех времен, - phpMyAdmin, WordPress, Nagios.
+
+Веб-сервер Apache до сих пор широко используется в некоторых задачах:
+
+платформа 1C-Битрикс - под капотом как раз использует LAMP-стек, предоставляя уже настроенные сервисы, которые позволяют начать разработку, не занимаясь настройкой (до каких-то пор);
+Web-хостинги - платформы, которые позволяют просто загружать веб-контент на сервер в ограниченную правами директорию с уже настроенными компонентами, которая страновится доступна из интернета.
+Кроме самого веб-сервера, Apache принес с собой большое количество возможностей и инструментов, которые повсеместно используются и в других решениях. Хорошим примером является механизм Basic Auth и связанная с ним утилита htpasswd, которая, напомним, устанавливается из пакета apache2-utils.
+
+Если же сравнивать Apach с nginx, то можно понять, что они функционально и архитектурно сильно отличаются:
+
+nginx	Apache
+Обработка запросов на уровне запросов	Создан по принципу обработки запросов в виде событий в едином процессе с дочерними потоками, в которых и производится обработка	Имеет несколько режимов обработки запросов через так называемые Multi-Processing Modules, однако они все завязаны на создание новых потоков или процессов обработки, в которых и производится работа
+Обработка статики	За счет того, что одним и основополагающих принципов при разработке nginx была отдача статики, он способен выдерживать большую нагрузку по запросам статики, а также способен кешировать ее в памяти для ускорения дальнейших ответов	Раздает изображения из директорий с расчетом на то, что вместе со статикой будет обрабатываться и динамика, приоритет на которую и был сделан при разработке данного веб-сервера
+Работа с динамикой	Может работать с динамикой только через проксирование запросов, поэтому требуется, кроме nginx, конфигурировать и среду исполнения кода (к примеру, PHP-FPM, который мы будем разбирать позднее)	За счет модульной архитектуры позволяет включать через модули возможность работы с динамическим контентом, к примеру, с PHP при помощи mod_php
+Конфигурация	Поддерживает только централизованную конфигурацию через основной файл, а также статически подключаемые файлы через директиву include	Поддерживает, кроме статического метода конфигурирования, еще и конфигурацию на уровне директорий при помощи файлов .htaccess, что широко используется на веб-хостингах, где такой контроль может потребоваться
+Обработка запросов	Полагается на понятие location, в котором можно задать любою логику, как отдачу статики, так и проксирование запросов в разные сервисы	По большей части завязан на работу с директориями и файлами в них, однако позволяет и работать с разными location, но не в таком же виде, как nginx, а с более ограниченной функциональностью
+Модульность	nginx поддерживает модули, но для их подключения требуется собирать свой бинарный файл. С точки зрения гибкости данное решение проигрывает конкуренту, но при этом выигрывает в скорости	Поддерживает большое количество модулей, которые можно включить в любой момент (мы привели как минимум один ранее - mod_php). Из-за этого Apache хоть и более гибкий, но это отражается на его произволительности
+На секунду вернемся к пункту про работу с динамикой в nginx - как мы сказали, при работе с PHP проксирование часто производится на PHP-FPM, однако в роли среды исполнения для PHP можно также использовать и Apache с модулем mod_php.
+
+Как видно, nginx и Apache во многом похожи, поэтому конфигурационные файлы у них ожидаемо будут похожи по логике, но различны по структуре и формату. Приступим же к разбору конфигурационного файла, который, как правило, расположен в /etc/apache2/apache2.conf:
+
+# Позволяет задать, где хранятся другие конфигурационные файлы и логи,
+# по умолчанию использует ту директорию, с которой был собран apache.
+# Для Ubuntu - /etc/apache2
+#ServerRoot "/etc/apache2"
+
+# Определяет директорию, где будут храниться все файлы, используемые при работе веб-сервера
+# Важно обратить внимание на то, что здесь используется обращение к переменной. 
+# Можно использовать переменную из внешних переменных окружений, с которыми запускается Apache, 
+# или установленную через директивы SetEnv, SetEnvIf или SetEnfIfNoCase.
+DefaultRuntimeDir ${APACHE_RUN_DIR}
+
+# Определяем, где должен храниться PID-файл
+PidFile ${APACHE_PID_FILE}
+
+#
+# Время на обработку запроса
+Timeout 300
+
+# Флаг, который определяет, требуется ли поддерживаеть соединение с клиентом при запросе
+KeepAlive On
+
+# Количество запросов, которые разрешены в рамках одного Keep Alive соединения (0 - безлимитное)
+MaxKeepAliveRequests 100
+
+# Таймаут на ожидание запроса в рамках Keep Alive соединения
+KeepAliveTimeout 5
+
+
+# Пользователь и группа, от имени которых запускается веб-сервер
+User ${APACHE_RUN_USER}
+Group ${APACHE_RUN_GROUP}
+
+# Определяет, требуется ли делать обратный DNS-запрос по адресу клиента при логировании из IP-адреса
+HostnameLookups Off
+
+# Где должен храниться лог с ошибками
+ErrorLog ${APACHE_LOG_DIR}/error.log
+
+# Уровень логов, которые будут писаться в ErrorLog
+LogLevel warn
+
+# Определение, какие порты должен слушать веб-сервер. Пример файла:
+##Listen 80
+##
+### Данная условная директива проверяет, подключен ли модуль и, если да, то включает эту директиву
+##<IfModule ssl_module>
+##	Listen 443
+##</IfModule>
+##
+##<IfModule mod_gnutls.c>
+##	Listen 443
+##</IfModule>
+Include ports.conf
+
+# Подключить модули. Отличие Include от IncludeOptional в том,
+# что если подключение по Wildcard (*) не вернет файлов, то ошибки при запуске веб-сервера не произойдет
+IncludeOptional mods-enabled/*.load
+IncludeOptional mods-enabled/*.conf
+
+# Определяет то, как нужно работать с основными директориями
+# веб-сервера (так называемая модель безопасности) - разрешает 
+# обращаться к файлам только в /usr/share и /var/www, в остальных - запрещает
+<Directory />
+	Options FollowSymLinks
+	AllowOverride None
+	Require all denied
+</Directory>
+
+<Directory /usr/share>
+	AllowOverride None
+	Require all granted
+</Directory>
+
+<Directory /var/www/>
+	Options Indexes FollowSymLinks
+	AllowOverride None
+	Require all granted
+</Directory>
+
+# Имя файла, которое позволяет переписать директивы работы в 
+# конкретной директории. Для работы требуется, чтобы в Directory 
+# была включена директива AllowOverride
+AccessFileName .htaccess
+
+# Запрещает доступ к файлам, которые начинаются на .ht, такие как .htaccess и .htpasswd
+<FilesMatch "^\.ht">
+	Require all denied
+</FilesMatch>
+
+
+# Определяет форматы логов, которые позднее можно использовать через CustomLog
+LogFormat "%v:%p %h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" vhost_combined
+LogFormat "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" combined
+LogFormat "%h %l %u %t \"%r\" %>s %O" common
+LogFormat "%{Referer}i -> %U" referer
+LogFormat "%{User-agent}i" agent
+
+# Используется для подключения сниппетов (к примеру, конфигурация работы с SSL)
+IncludeOptional conf-enabled/*.conf
+
+# Определяет определение виртуальных хостов
+IncludeOptional sites-enabled/*.conf
+
+# Пример:
+##<VirtualHost *:80> # Важно, чтобы порт был предварительно описан в ports.conf
+##	ServerName www.example.com
+##	ServerAlias *.example.com
+##
+##	DocumentRoot /var/www/html
+##
+##	LogLevel info ssl:warn
+##
+##	ErrorLog ${APACHE_LOG_DIR}/error.log
+##	CustomLog ${APACHE_LOG_DIR}/access.log combined
+##
+##	<Location "/status">
+##	  SetHandler server-status
+##	  Require host example.com
+##	</Location>
+##
+##	<LocationMatch "/error/(?<NUMBER>[0-9]+)">
+##	    Alias "/usr/local/apache/errors/%{env:MATCH_NUMBER}.html"
+##	</LocationMatch>
+##
+##	<Location "/proxy/">
+##	    ProxyPass "https://2ip.ru"
+##	</Location>
+##
+##	Alias "/image" "/ftp/pub/image"
+##	<Directory "/ftp/pub/image">
+##	    Require all granted
+##	</Directory>
+##
+##	#Include conf-available/serve-cgi-bin.conf
+##
+##</VirtualHost>
+Для работы с модулями можно либо сделать вручную линки из /etc/apache2/mods-available/ в /etc/apache2/mods-enabled/, либо воспользоваться командой a2enmod и a2dismod для включения и отключения модуля соответственно.
+
+
+
+
