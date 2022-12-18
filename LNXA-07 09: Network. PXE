@@ -1,0 +1,246 @@
+Задание:
+Основываясь на предыдущем задании, установить одну машину как PXE-сервер. В качестве DHCP сервера используйте dnsmasq.
+Создать вторую машину, которая должна будет загружаться по сети.
+Настроить запуск установки Ubuntu через PXE.
+В ответе приложите файлы конфигурации вашего PXE сервера и лог загрузки с него второй машины.
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+01.11.2022 08:25
+Установка
+ip addr add 192.168.1.10/24 dev enp0s8
+
+sudo apt install dnsmasq
+vi /etc/dnsmasq.d/pxe.conf
+interface=enp0s8,lo
+bind-interfaces
+dhcp-range=enp0s8,192.168.1.20,192.168.1.200
+dhcp-boot=pxelinux.0
+enable-tftp
+tftp-root=/srv/tftp
+port=0
+
+sudo systemctl restart dnsmasq.service
+
+
+Downloading pxelinux.o
+ wget http://archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/current/legacy-images/netboot/pxelinux.0
+ mkdir -p /srv/tftp
+ mv pxelinux.0 /srv/tftp/
+
+mount ubuntu-22.04.1-desktop-amd64.iso /mnt
+cp /mnt/casper/{vmlinuz,initrd} /srv/tftp/
+
+apt install syslinux-common
+cp /usr/lib/syslinux/modules/bios/ldlinux.c32 /srv/tftp/
+Конфиги
+DEFAULT install
+LABEL install
+  KERNEL vmlinuz
+  INITRD initrd
+  APPEND root=/dev/ram0 ramdisk_size=1500000 ip=dhcp url=http://releases.ubuntu.com/jammy/ubuntu-22.04.1-desktop-amd64.iso
+
+
+Инструкции по установке
+https://discourse.ubuntu.com/t/netbooting-the-live-server-installer/14510
+
+
+Как итог.
+Получилось запустить установщик!! Ура!!
+
+Были проблемы с оперативой и копированием из виртуалки, но в целом справился.
+
+root@pxe:/srv/tftp/pxelinux.cfg# cat default 
+DEFAULT install
+LABEL install
+  KERNEL vmlinuz
+  INITRD initrd
+  APPEND root=/dev/ram0 ramdisk_size=1500000 ip=dhcp url=http://192.168.1.10/ubuntu-22.04.1-desktop-amd64.iso
+
+
+root@f-VirtualBox:/var/log/installer# cat casper.log 
+Internet Systems Consortium DHCP Client 4.4.1
+Copyright 2004-2018 Internet Systems Consortium.
+All rights reserved.
+For info, please visit https://www.isc.org/software/dhcp/
+
+Listening on LPF/enp0s3/08:00:27:ef:f9:e3
+Sending on   LPF/enp0s3/08:00:27:ef:f9:e3
+Sending on   Socket/fallback
+DHCPDISCOVER on enp0s3 to 255.255.255.255 port 67 interval 3 (xid=0xd551574e)
+No DHCPOFFERS received.
+No working leases in persistent database - sleeping.
+Internet Systems Consortium DHCP Client 4.4.1
+Copyright 2004-2018 Internet Systems Consortium.
+All rights reserved.
+For info, please visit https://www.isc.org/software/dhcp/
+
+Listening on LPF/enp0s3/08:00:27:ef:f9:e3
+Sending on   LPF/enp0s3/08:00:27:ef:f9:e3
+Sending on   Socket/fallback
+DHCPDISCOVER on enp0s3 to 255.255.255.255 port 67 interval 3 (xid=0x1d12882c)
+DHCPOFFER of 192.168.1.29 from 192.168.1.10
+DHCPREQUEST for 192.168.1.29 on enp0s3 to 255.255.255.255 port 67 (xid=0x2c88121d)
+DHCPACK of 192.168.1.29 from 192.168.1.10 (xid=0x1d12882c)
+bound to 192.168.1.29 -- renewal in 1427 seconds.
+no search or nameservers found in /run/net-enp0s3.conf /run/net-enp0s3.conf /run/net6-*.conf
+Begin: Running /scripts/casper-premount ... done.
+done.
+Begin: Trying netboot from 192.168.1.10: ... Begin: Trying to download and mount http://192.168.1.10/ubuntu-22.04.1-desktop-amd64.iso ... Connecting to 192.168.1.10 (192.168.1.10:80)
+ubuntu-22.04.1-deskt   3% |*                               |  133M  0:00:26 ETA
+ubuntu-22.04.1-deskt   9% |***                             |  358M  0:00:18 ETA
+ubuntu-22.04.1-deskt  15% |****                            |  567M  0:00:16 ETA
+ubuntu-22.04.1-deskt  21% |******                          |  775M  0:00:14 ETA
+ubuntu-22.04.1-deskt  26% |********                        |  975M  0:00:13 ETA
+ubuntu-22.04.1-deskt  31% |**********                      | 1143M  0:00:13 ETA
+ubuntu-22.04.1-deskt  35% |***********                     | 1281M  0:00:12 ETA
+ubuntu-22.04.1-deskt  40% |************                    | 1471M  0:00:11 ETA
+ubuntu-22.04.1-deskt  45% |**************                  | 1667M  0:00:10 ETA
+ubuntu-22.04.1-deskt  51% |****************                | 1866M  0:00:09 ETA
+ubuntu-22.04.1-deskt  56% |******************              | 2070M  0:00:08 ETA
+ubuntu-22.04.1-deskt  62% |*******************             | 2265M  0:00:07 ETA
+ubuntu-22.04.1-deskt  67% |*********************           | 2459M  0:00:06 ETA
+ubuntu-22.04.1-deskt  72% |***********************         | 2650M  0:00:05 ETA
+ubuntu-22.04.1-deskt  77% |************************        | 2842M  0:00:04 ETA
+ubuntu-22.04.1-deskt  83% |**************************      | 3031M  0:00:03 ETA
+ubuntu-22.04.1-deskt  88% |****************************    | 3224M  0:00:02 ETA
+ubuntu-22.04.1-deskt  93% |*****************************   | 3414M  0:00:01 ETA
+ubuntu-22.04.1-deskt  98% |******************************* | 3599M  0:00:00 ETA
+ubuntu-22.04.1-deskt 100% |********************************| 3649M  0:00:00 ETA
+done.
+done.
+Begin: Creating debconf-communicate fifo mechanism ... done.
+Begin: Running /scripts/casper-bottom ... Begin: Moving mount points... ... done.
+Begin: Configuring fstab... ... done.
+Begin: Setting up swap... ... done.
+Begin: Setting up locales... ... done.
+Begin: Setting up automatic login... ... done.
+Begin: Disabling systemd's GPT auto generator... ... done.
+Begin: Setting hostname... ... done.
+Begin: Setting up console keyboard... ... done.
+Begin: Applying desktop settings... ... done.
+Begin: Regenerating SSL certificate... ... done.
+Begin: Loading preseed file... ... done.
+Begin: Adding live session user... ... passwd: password expiry information changed.
+dbus-daemon[608]: [session uid=999 pid=608] Activating service name='org.gtk.vfs.Daemon' requested by ':1.0' (uid=999 pid=609 comm="" label="unconfined")
+dbus-daemon[608]: [session uid=999 pid=608] Successfully activated service 'org.gtk.vfs.Daemon'
+dbus-daemon[608]: [session uid=999 pid=608] Activating service name='org.gtk.vfs.Metadata' requested by ':1.0' (uid=999 pid=609 comm="" label="unconfined")
+fuse: device not found, try 'modprobe fuse' first
+dbus-daemon[608]: [session uid=999 pid=608] Successfully activated service 'org.gtk.vfs.Metadata'
+A connection to the bus can't be made
+done.
+Begin: Setting up init... ... done.
+Begin: Configuring accessibility options... ... done.
+Begin: Disabling update-notifier... ... done.
+Begin: Configuring power management... ... done.
+Begin: Enabling detection of crashes... ... done.
+Begin: Disabling unnecessary KDE services... ... done.
+Begin: Fixing language selector... ... done.
+Begin: Disabling trackerd... ... done.
+Begin: Adding APT-CDROM source... ... Using CD-ROM mount point /cdrom/
+Identifying... [e13fa3b3f64d1f8708d539aaec175438-2]
+Scanning disc for index files...
+Found 2 package indexes, 0 source indexes, 0 translation indexes and 1 signatures
+Found label 'Ubuntu 22.04.1 LTS _Jammy Jellyfish_ - Release amd64 (20220809.1)'
+This disc is called: 
+'Ubuntu 22.04.1 LTS _Jammy Jellyfish_ - Release amd64 (20220809.1)'
+Copying package lists...gpgv: Signature made Tue Aug  9 12:07:57 2022 UTC
+gpgv:                using RSA key 843938DF228D22F7B3742BC0D94AA3F0EFE21092
+gpgv: Good signature from "Ubuntu CD Image Automatic Signing Key (2012) <cdimage@ubuntu.com>"
+Reading Package Indexes... Done
+Writing new source list
+Source list entries for this disc are:
+deb cdrom:[Ubuntu 22.04.1 LTS _Jammy Jellyfish_ - Release amd64 (20220809.1)]/ jammy main restricted
+Repeat this process for the rest of the CDs in your set.
+done.
+Begin: Possibly disabling update-initramfs (useless on a live CD)... ... done.
+Begin: Grant administrative PolicyKit privileges to default user... ... done.
+Begin: Configuring jackd2... ... done.
+Begin: Disabling unity8's first run wizard... ... done.
+Begin: Disabling gnome-initial-setup... ... done.
+Begin: Disabling security unattended-upgrades... ... done.
+Begin: Disabling snap refresh... ... done.
+Begin: Overriding 71-nvidia.rules... ... done.
+Begin: Configuring pollinate... ... Begin: Disabling ibus-mozc auto setup... ... done.
+Begin: Set up the installer log directory for adm users... ... done.
+done.
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+01.11.2022 13:15
+Добрый день!
+
+Отличные знание темы и выполнение задания, хорошо что добиваетесь результата, замечаний и вопросов нет!
+
+
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+
+LNXA-07 09: Network. PXE
+Описание:
+Технология PXE (Preboot Execution Environment) является способом, позволяющим компьютеру загружаться, используя только свою сетевую карту. Этот метод загрузки был создан еще в 1999 году и, если компьютер подключен к сети (и поддерживает этот стандарт), то можно обойти обычную процедуру загрузки с диска и использовать компьютер как бездисковую станцию, например, для решений терминального доступа.
+
+Процедура выглядит следующим образом:
+
+Клиент передает DHCP DISCOVER сообщение.
+DHCP - сервер отвечает с IP-адресом, параметром next-server, загрузочным именем файла и root-path значением.
+Клиент отправляет TFTP-запрос с next-server, запрашивая получение имени файла.
+Сервер TFTP отвечает и отправляет имя файла клиенту.
+Клиент вводит имя файла (то есть, среда PXE boot), который затем загружает ядро ОС и далее указанную корневую файловую систему в root-path.
+Существует несколько видов загрузчиков PXE, но самыми распространенными являются PXELinux и iPXE. Второй вариант является более быстрым, может работать по HTTP и имеет ряд преимуществ, о которых можно прочитать по ссылке, в то же время первый вариант является самым распространенным, его мы и будем рассматривать.
+
+Рассмотрим вариант загрузки установочного образа Debian. Прежде всего, нам нужно установить DHCP-сервер (рассмотренный ранее), который будет выдавать необходимые параметры, для dhcpd конфигурация будет выглядеть примерно следующим образом:
+
+subnet 192.168.1.0 netmask 255.255.255.0 {
+  range 192.168.1.20 192.168.1.200;
+  option routers 192.168.1.1;
+  option broadcast-address 192.168.1.255;
+  option subnet-mask 255.255.255.0;
+
+  option domain-name "debian.local";
+  option domain-name-servers 192.168.1.1;
+        allow booting;
+        allow bootp;
+if option arch = 00:07 or option arch = 00:09 {
+      filename "bootnetx64.efi";
+    } else {
+      filename "pxelinux.0";
+    }
+  next-server 192.168.1.10;
+}
+Где параметр if option arch = 00:07 or option arch = 00:09 указывает на то, что если конечное устройство является машиной на основе UEFI, то для загрузки будет использоваться bootnetx64.efi, для остальных вариантов будет использоваться pxelinux.0, а next-server 192.168.1.10 указывает на IP-адрес сервера TFTP, где и находятся pxelinux.0 или bootnetx64.efi.
+
+Далее нам нужно установить TFTP-сервер командой apt install tftpd-hpa и настроить отдачу файлов в файле конфигурации /etc/default/tftpd-hpa вида:
+
+TFTP_USERNAME="tftp"
+TFTP_DIRECTORY="/srv/tftp"
+TFTP_ADDRESS="0.0.0.0:69"
+Затем нам нужно установить загрузчик командой apt install syslinux-utils syslinux, после чего скачать образ ОС и, собрав все вместе, положить в нужную дирректорию:
+
+wget http://ftp.ru.debian.org/debian/dists/stretch/main/installer-amd64/current/images/netboot/netboot.tar.gz
+tar xfz netboot.tar.gz -C /srv/tftp/
+cp /usr/lib/syslinux/memdisk /srv/tftp/
+ln -s /srv/tftp/debian-installer/amd64/bootnetx64.efi /srv/tftp/
+Ну и далее, нам нужно определить конфигурацию загрузки, создав файл /srv/tftp/debian-installer/amd64/boot-screens/txt.cfg со следующим содержимым:
+
+label install
+menu label ^Install
+kernel debian-installer/amd64/linux
+append vga=788 initrd=debian-installer/amd64/initrd.gz --- quiet
+Далее, запустив все демоны и настроив клиента на загрузку по PXE, мы получим установку Debian.
+
+Что касается настройки клиента на загрузку, в BIOS выставляются параметры, откуда машина может загружаться. Как мы можем указывать загрузку с диска или CD, так же мы можем указать загрузку с сетевого интерфейса.
+
+Полезные ссылки:
+Desktop/PXE
+Preboot Execution Environment
