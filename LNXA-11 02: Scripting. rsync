@@ -1,0 +1,206 @@
+Задание:
+Напишите команду rsync с одним аргументом, которая:
+рекурсивно копирует данные;
+сохраняет символические ссылки, права на файлы, время изменения файлов;
+сохраняет группу и пользователя файлов.
+Сформируйте конфиг rsync сервера, который должен содержать секции logs и secrets со следующими параметрами:
+Секция logs:
+Данные должны храниться в директории /storage/logs/.
+Файлы вида *.gz не нужно сжимать при передаче.
+Секция secrets:
+Данные должны храниться в директории /storage/secrets/.
+Должен быть запрещен листинг файлов.
+Остальные настройки:
+Максимальное количество одновременных подключений - 44.
+Пользователь для подключения в обеих секциях - rebrain.
+Пользователь, от которого запущен rsync демон, - rebrainme.
+Напишите команду rsync, которая:
+Копирует из директории A в B все файлы, кроме файлов, заканчивающихся на .jpg.
+Скорость копирования должна быть ограничена 1234 KBPS.
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+06.12.2022 08:21
+1. Напишите команду rsync с одним аргументом, которая: 1)рекурсивно копирует данные; 2) сохраняет символические ссылки, права на файлы, время изменения файлов; 3) сохраняет группу и пользователя файлов.
+ssh yc-user@158.160.14.4
+rsync -h
+-a, --archive               archive mode; equals -rlptgoD (no -H,-A,-X)
+
+rsync -a /etc /tmp/
+ll /tmp/etc/
+...
+8 root root    4096 Jun 10  2021 networkd-dispatcher/
+drwxr-xr-x   7 root root    4096 Dec  4 12:56 NetworkManager/
+-rw-r--r--   1 root root      91 Dec  5  2019 networks
+drwxr-xr-x   2 root root    4096 Jun 10  2021 newt/
+-rw-r--r--   1 root root     542 Dec  4 12:58 nsswitch.conf
+drwxr-xr-x   4 root root    4096 Dec  4 12:54 openvpn/
+drwxr-xr-x   2 root root    4096 Jul 31  2020 opt/
+lrwxrwxrwx   1 root root      21 Aug 22 10:54 os-release -> ../usr/lib/os-release
+drwxr-xr-x   2 root root    4096 Jun 10  2021 PackageKit/
+-rw-r--r--   1 root root     552 Dec 17  2019 pam.conf
+drwxr-xr-x   2 root root    4096 Dec  5 07:34 pam.d/
+-rw-r--r--   1 root root       7 Dec  4 12:52 papersize
+-rw-r--r--   1 root root    2925 Dec  5 05:00 passwd
+-rw-r--r--   1 root root    2932 Dec  5 05:00 passwd-
+drwxr-xr-x   2 root root    4096 Dec  4 12:53 pcmcia/
+drwxr-xr-x   3 root root    4096 Dec  4 12:40 perl/
+drwxr-xr-x   4 root root    4096 Dec  4 12:45 pki/
+drwxr-xr-x   3 root root    4096 Jun 10  2021 pm/
+-rw-r--r--   1 root root    7649 Dec  4 12:59 pnm2ppa.conf
+drwxr-xr-x   4 root root    4096 Jun 10  2021 polkit-1/
+-rw-r--r--   1 root root     350 Jun 10  2021 popularity-contest.conf
+drwxr-xr-x   7 root dip     4096 Dec  4 12:54 ppp/
+-rw-r--r--   1 root root     581 Dec  5  2019 profile
+drwxr-xr-x   2 root root    4096 Dec  4 12:55 profile.d/
+-rw-r--r--   1 root root    2932 Apr  1  2013 protocols
+drwxr-xr-x   3 root root    4096 Dec  4 12:58 pulse/
+-rw-------   1 root root       0 Jul 31  2020 .pwd.lock
+drwxr-xr-x   2 root root    4096 Jun 10  2021 python3/
+drwxr-xr-x   2 root root    4096 Nov 26 15:53 python3.8/
+drwxr-xr-x   2 root root    4096 Dec  5 05:00 rc0.d/
+drwxr-xr-x   2 root root    4096 Dec  5 05:00 rc1.d/
+drwxr-xr-x   2 root root    4096 Dec  5 05:00 rc2.d/
+drwxr-xr-x   2 root root    4096 Dec  5 05:00 rc3.d/
+drwxr-xr-x   2 root root    4096 Dec  5 05:00 rc4.d/
+drwxr-xr-x   2 root root    4096 Dec  5 05:00 rc5.d/
+drwxr-xr-x   2 root root    4096 Dec  5 05:00 rc6.d/
+drwxr-xr-x   2 root root    4096 Dec  5 05:00 rcS.d/
+lrwxrwxrwx   1 root root      39 Jun 10  2021 resolv.conf -> ../run/systemd/resolve/stub-resolv.conf
+lrwxrwxrwx   1 root root      13 Mar 15  2022 rmt -> /usr/sbin/rmt*
+-rw-r--r--   1 root root     887 Apr  1  2013 rpc
+-rw-r--r--   1 root root    1382 Feb 11  2020 rsyslog.conf
+drwxr-xr-x   2 root root    4096 Nov 26 15:54 rsyslog.d/
+-rw-r--r--   1 root root    5211 Mar 11  2020 rygel.conf
+drwxr-xr-x   3 root root    4096 Dec  4 12:59 sane.d/
+drwxr-xr-x   4 root root    4096 Dec  4 12:52 security/
+drwxr-xr-x   2 root root    4096 Jun 10  2021 selinux/
+-rw-r--r--   1 root root   10593 Mar 31  2022 sensors3.conf
+drwxr-xr-x   2 root root    4096 Dec  4 12:52 sensors.d/
+-rw-r--r--   1 root root   14464 Feb 16  2020 services
+drwxr-xr-x   3 root root    4096 Dec  4 13:02 sgml/
+-rw-r-----   1 root shadow  1422 Dec  5 05:00 shadow
+...
+
+Как видно ссылки сохранились. Ура!
+2. Сформируйте конфиг rsync сервера, который должен содержать секции logs и secrets со следующими параметрами:
+vi /etc/rsyncd.conf
+pid file = /var/run/rsyncd.pid
+lock file = /var/run/rsync.lock
+log file = /var/log/rsync.log
+uid = rebrainme
+gid = rebrainme
+auth users = rebrain
+max connections = 44
+[logs]
+path = /storage/logs/
+dont compress = '*.gz'
+list = true
+[secrets]
+path = /storage/secrets/
+list = false
+
+
+3. Напишите команду rsync, которая: 1) Копирует из директории A в B все файлы, кроме файлов, заканчивающихся на .jpg. 2) Скорость копирования должна быть ограничена 1234 KBPS.
+ root@epdv7n6s2re5cm2egn84:~# ll /home/yc-user/files/ | grep jpg
+-rw-r--r-- 1 root    root       0 Dec  6 05:08 fff[1-4].jpg
+-rw-r--r-- 1 root    root       0 Dec  6 05:08 fff[14].jpg
+-rw-r--r-- 1 root    root       0 Dec  6 05:08 fff{1-4}.jpg
+
+root@epdv7n6s2re5cm2egn84:~# ll -1 /home/yc-user/files/ | wc -l
+107
+
+
+ rsync -r  --exclude='*.jpg' --bwlimit=1234 /home/yc-user/files/ ~/files
+
+root@epdv7n6s2re5cm2egn84:~# ll files/ | wc -l
+104
+
+
+ 
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 5
+06.12.2022 23:50
+Здравствуйте! Отлично справились с заданием, замечаний нет.
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+
+LNXA-11 02: Scripting. rsync
+Описание:
+Rsync (Remote Sync) - программа для удаленного и локального синхронизирования каталогов и файлов. Она отлично подходит для удаленного копирования файлов, резервного копирования, зеркалирования между различными системами или частями одной системы. Rsync может быть запущен как в режиме сервера (например, для резервного копирования), так в в виде консольной команды.
+
+Изначально rsync был создан как замена команды scp, но с некоторыми приятными особенностями. Rsync использует алгоритм для эффективной передачи данных. Если на принимающей стороне уже содержится некоторая версия данных, то rsync передает только отличающиеся данные. Упрощенно алгоритм выглядит следующим образом: обе стороны, участвующие в передаче данных, разбивают файлы на части и для каждой части считают две контрольные сигнатуры. Одна из них - быстрая сигнатура, которая должна работать быстро и предотвращать избыточное вычисление второй, стойкой сигнатуры. В качестве быстрой сигнатуры используется кольцевой хеш Adler32, стойкая чексумма - MD5 (MD4 - в ранних версиях протокола). На основе этих двух сигнатур и частей данных стороны определяют нужные для передачи файлы.
+
+Синтаксис консильной утилиты rsync позволяет выполнить большой набор функций. Ниже представлены одни из самых популярных:
+
+установка ограничения скорости передачи;
+исключение копирования файлов по паттерну;
+удаление на приемнике файлов, которых уже нет на источнике;
+рекурсивное копирование;
+сохранение ссылок;
+сохранение параметров файлов (права, время изменения, etc);
+сжатие данных во время передачи;
+ограничение размера файлов при передаче (в обе стороны);
+использование ssh при копировании данных.
+Рассмотрим некоторые примеры:
+
+rsync -rlpgovH --delete <USER>@<IP>::<SOURCE>/ <DEST>/
+В данном примере происходит синхронизация данных с сервера IP в директорию DEST, причем:
+
+данные синхронизируются рекурсивно (-r);
+с сохранением символических (-l) и жестких (-H) ссылок;
+с сохранением прав на файлы (-p), группы (-g) и владельца (-o);
+с выводом дополнительной информации при синхронизации (-v);
+с удалением в DEST файлов, которых нет на источнике.
+# rsync -pt --bwlimit=30000 --partial --append-verify --progress --log-file=/var/log/logbackup.log --password-file=/etc/logbackup-rsync.passwd <SRC_FILE> rsync://<rebrainme>@<IP>/<RSYNC_PATH>/<PATH>/
+   223707136  58%   28.42MB/s    0:00:05  ^C
+rsync error: received SIGINT, SIGTERM, or SIGHUP (code 20) at rsync.c(549) [sender=3.0.9]
+
+# rsync -pt --bwlimit=30000 --partial --append-verify --progress --log-file=/var/log/logbackup.log --password-file=/etc/logbackup-rsync.passwd <SRC_FILE> rsync://<rebrainme>@<IP>/<RSYNC_PATH>/<PATH>/
+   379204806 100%   65.05MB/s    0:00:05 (xfer#1, to-check=0/1)
+
+sent 137524905 bytes  received 27 bytes  21157681.85 bytes/sec
+total size is 379204806  speedup is 2.76
+Рассмотрим, что же происходит в данном примере. Как видно, копируется одни файл с локального хоста на удаленный rsync сервер. Причем:
+
+Сохраняются права на файл (-p) и время изменения (-t).
+Скорость ограничена в 30000 KBPS (--bwlimit=30000). Во втором запуске она больше, так как происходит докачка.
+Сохраняются даже не полностью скопированные файлы (--partial ) и докачиваются при следующем запуске (--append-verify).
+Выводится информация о копировании (--progress).
+Логи записываются в отдельный файл (--log-file=/var/log/logbackup.log).
+Пароль берется из внешнего файла (--password-file=/etc/logbackup-rsync.passwd).
+Для работы предыдущего примера на сервере должен быть запущен rsync в режиме демона со следующим конфигом:
+
+# cat /etc/rsync.conf
+uid = nobody
+gid = nobody
+use chroot = no
+max connections = 4
+pid file = /var/run/rsyncd.pid
+[< RSYNC_PATH >]
+    uid = root
+    gid = root
+    comment = rebrainme logs backup
+    path = /path_in_fs
+    auth users = rebrainme
+    transfer logging = true
+    log file = /var/log/rsync.log
+    secrets file = /etc/rsyncd.secrets
+Как видно из примеров, Rsync предоставляет большие возможности для передачи данных. Часто его используют для зеркалирования и резервного копирования. С помощью таких инструментов, как cron, ssh и rsync легко можно организовать зеркалирование данных по криптографическому каналу между несколькими компьютерами.
+
+Больше информации про работу утилиты rsync можно найти в ее документации.
+
+Полезные ссылки:
+The rsync algorithm
+Man rsync (Russian)
+Linux: примеры использования rsync
