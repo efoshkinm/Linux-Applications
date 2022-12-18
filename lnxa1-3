@@ -1,0 +1,515 @@
+Задание:
+Напишите конфигурационный файл nginx, взяв за основу конфигурацонный файл из предыдущего задания, который реализует следующую функциональность:
+Отключен модуль mail.
+Должен быть реализован конфиг для default_server, описанный в описании.
+В отдельном конфигурационном файле должен быть описан server, который слушает на 80 порту и использует домен, полученный при помощи сервиса http://nip.io/. Например, Ваш публичный адрес 100.101.102.103, тогда один из вариантов имени будет app.100.101.102.103.nip.io. Если этот сервис недоступен, то можно воспользоваться любым аналогичным.
+Используется формат логов с именем logz, который содержит только информацию о том, откуда был произведен запрос, в какое время, какой был произведен запрос и какой HTTP код был возвращен при запросе.
+Логи должны писаться в файл `/var/log/nginx/nip.access.log.
+Разрешены обращения со всех хостов, кроме 10.10.10.10.
+Для всех путей используется basic auth с пользователем rebrain и паролем linux, кроме /noauth/*.
+В роли root используется /var/www/html/.
+В роли index - /var/www/html/index.nginx-debian.html, которая должна возвращаться при обращении к /.
+Путь /rbm_images/* должен отдавать файлы из /var/www/rebrain/images/, в котором должен быть расположен файл http://rebrainme.com/files/logo_rebrain_black.png под именем logo.png.
+Запрос на /example/ должен проксироваться на https://example.com/, обращение к которому производится через upstream.
+Запрос на /browser/ должен возвращать сообщение типа Hello, $browser, где $browser строится на базе User Agent по регулярному выражению. Как пример, обращение из Firefox должно использовать как значение Firefox, а любой неизвестный вариант - Noname.
+В ответе пришлите:
+конфигурационный файл default сервер и путь до него;
+конфигурационный файл для основного сервера и путь до него;
+список файлов в /etc/nginx/modules-enabled/;
+Содержимое файла, используемого для basic auth
+
+*********************************************************************************
+Решение
+*********************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+11.06.2022 11:45
+root@epdlre5ciemiidvugq7r:/etc/nginx# cd sites-enabled/
+root@epdlre5ciemiidvugq7r:/etc/nginx/sites-enabled# ll
+total 8
+drwxr-xr-x 2 root root 4096 Jun 10 07:35 ./
+drwxr-xr-x 8 root root 4096 Jun 10 06:43 ../
+lrwxrwxrwx 1 root root   22 Jun 10 06:48 nip -> ../sites-available/nip
+root@epdlre5ciemiidvugq7r:/etc/nginx/sites-enabled# cat nip
+log_format logz '$remote_addr [$time_local]'
+                '"$request" $status';
+								
+resolver 8.8.8.8;
+upstream  example {
+     server  example.com;
+}
+
+map $http_user_agent $browser {
+    "Mozilla"    "yabrowser";
+      }
+ 
+server {
+       listen 80 default_server;
+       listen [::]:80 default_server;
+       deny 10.10.10.10;
+       allow all;
+       auth_basic         "Rebrain lnxa 01 02";
+       auth_basic_user_file    /etc/nginx/.htpasswd;
+       access_log /var/log/nginx/nip.access.log logz;
+       server_name 84.201.160.42.nip.io;
+       root /var/www/html;
+#       index index.nginx-debian.html;
+       location / {          
+              index index.nginx-debian.html;
+              try_files  $uri $uri/ =404;
+       }
+       location /rbm_images/ {
+              alias /var/www/rebrain/images/ ;
+            #  try_files $uri $uri/ *;
+              autoindex on;
+       }       
+       location /noauth/ {
+            auth_basic off;
+       }
+       location /example/ {
+            proxy_pass http://example;
+            proxy_set_header Host example.com;
+#            proxy_set_header X-Forwarded-For $remote_addr;
+       }
+
+       location /browser/ {
+          return 500 $browser;
+      }
+}
+
+
+root@epdlre5ciemiidvugq7r:/etc/nginx# cat .htpasswd 
+rebrain:$apr1$vaAOMi7u$7ZQ9edggJOo6M/vXFG9ma.
+root@epdlre5ciemiidvugq7r:/etc/nginx# 
+
+
+root@epdlre5ciemiidvugq7r:/etc/nginx# cd modules-enabled/
+root@epdlre5ciemiidvugq7r:/etc/nginx/modules-enabled# ll
+total 24
+drwxr-xr-x 2 root root 4096 Jun 10 06:40 ./
+drwxr-xr-x 8 root root 4096 Jun 10 06:43 ../
+lrwxrwxrwx 1 root root   57 Jun 10 06:40 50-mod-http-auth-pam.conf -> /usr/share/nginx/modules-available/mod-http-auth-pam.conf
+lrwxrwxrwx 1 root root   56 Jun 10 06:40 50-mod-http-dav-ext.conf -> /usr/share/nginx/modules-available/mod-http-dav-ext.conf
+lrwxrwxrwx 1 root root   53 Jun 10 06:40 50-mod-http-echo.conf -> /usr/share/nginx/modules-available/mod-http-echo.conf
+lrwxrwxrwx 1 root root   55 Jun 10 06:40 50-mod-http-geoip2.conf -> /usr/share/nginx/modules-available/mod-http-geoip2.conf
+lrwxrwxrwx 1 root root   54 Jun 10 06:40 50-mod-http-geoip.conf -> /usr/share/nginx/modules-available/mod-http-geoip.conf
+lrwxrwxrwx 1 root root   61 Jun 10 06:40 50-mod-http-image-filter.conf -> /usr/share/nginx/modules-available/mod-http-image-filter.conf
+lrwxrwxrwx 1 root root   60 Jun 10 06:40 50-mod-http-subs-filter.conf -> /usr/share/nginx/modules-available/mod-http-subs-filter.conf
+lrwxrwxrwx 1 root root   62 Jun 10 06:40 50-mod-http-upstream-fair.conf -> /usr/share/nginx/modules-available/mod-http-upstream-fair.conf
+lrwxrwxrwx 1 root root   60 Jun 10 06:40 50-mod-http-xslt-filter.conf -> /usr/share/nginx/modules-available/mod-http-xslt-filter.conf
+lrwxrwxrwx 1 root root   48 Jun 10 06:40 50-mod-mail.conf -> /usr/share/nginx/modules-available/mod-mail.conf
+lrwxrwxrwx 1 root root   50 Jun 10 06:40 50-mod-stream.conf -> /usr/share/nginx/modules-available/mod-stream.conf
+root@epdlre5ciemiidvugq7r:/etc/nginx/modules-enabled# 
+
+
+
+
+
+Итоговый вариант с браузером. Я единственное не понял какой код должен возвращаться. Пробовал с 200, 301, 500. Решил оставить 301 так как в браузере видено сообщение. Меньше движений мышкой.
+
+root@epdlre5ciemiidvugq7r:/etc/nginx/sites-enabled# cat nip 
+log_format logz '$remote_addr [$time_local]'
+                '"$request" $status';
+								
+resolver 8.8.8.8;
+upstream  example {
+     server  example.com;
+}
+
+map $http_user_agent $browser {
+    "~*FireFox"    "firefox";
+     default     "Noname";
+      }
+ 
+server {
+       listen 80 default_server;
+       listen [::]:80 default_server;
+       deny 10.10.10.10;
+       allow all;
+       auth_basic         "Rebrain lnxa 01 02";
+       auth_basic_user_file    /etc/nginx/.htpasswd;
+       access_log /var/log/nginx/nip.access.log logz;
+       server_name 84.201.179.37.nip.io;
+       root /var/www/html;
+#       index index.nginx-debian.html;
+       location / {          
+              index index.nginx-debian.html;
+              try_files  $uri $uri/ =404;
+       }
+       location /rbm_images/ {
+              alias /var/www/rebrain/images/ ;
+            #  try_files $uri $uri/ *;
+              autoindex on;
+       }       
+       location /noauth/ {
+            auth_basic off;
+       }
+       location /example/ {
+            proxy_pass http://example;
+            proxy_set_header Host example.com;
+#            proxy_set_header X-Forwarded-For $remote_addr;
+       }
+
+       location /browser/ {
+          return 301 "Hello, $browser";
+      }
+}
+root@epdlre5ciemiidvugq7r:/etc/nginx/sites-enabled# 
+
+
+
+Для удобства проверки:
+http://84.201.179.37.nip.io/browser/
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 4
+11.06.2022 22:23
+Максим, здравствуйте! Чуть было не отправил задание на доработку после первой части ответа, вторая часть выглядит сильно лучше и даже сервер отвечает. В location /browser считаю нужен 200-й код, это ведь нормальный ответ сервера и точно не 500 и не 304.
+
+14.06.2022 11:26
+ВЫПОЛНЕНО 4
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+14.06.2022 11:26
+[m.efoshkin@fedora ~]$ yc compute instance create     --name efoshkin-lnxa-01-03     --network-interface subnet-name=default-ru-central1-b,nat-ip-version=ipv4     --zone ru-central1-b     --ssh-key ~/.ssh/id_rsa.pub     --cores 2     --core-fraction 5     --preemptible     --create-boot-disk image-folder-id=standard-images,image-family=ubuntu-2004-lts     --labels user_email=maxefoshkin@gmail.com,task_name=lnxa-01-03
+done (23s)
+id: epdui7glmmlcg8efj53t
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-06-14T08:16:47Z"
+name: efoshkin-lnxa-01-03
+labels:
+  task_name: lnxa-01-03
+  user_email: maxefoshkin@gmail.com
+zone_id: ru-central1-b
+platform_id: standard-v2
+resources:
+  memory: "2147483648"
+  cores: "2"
+  core_fraction: "5"
+status: RUNNING
+boot_disk:
+  mode: READ_WRITE
+  device_name: epdqs9ql2p4ovfv1fj2k
+  auto_delete: true
+  disk_id: epdqs9ql2p4ovfv1fj2k
+network_interfaces:
+- index: "0"
+  mac_address: d0:0d:1e:91:e1:5b
+  subnet_id: e2lebfr9cjkjg4ruk3gn
+  primary_v4_address:
+    address: 10.129.0.17
+    one_to_one_nat:
+      address: 130.193.55.244
+      ip_version: IPV4
+fqdn: epdui7glmmlcg8efj53t.auto.internal
+scheduling_policy:
+  preemptible: true
+network_settings:
+  type: STANDARD
+placement_policy: {}
+
+
+root@epdui7glmmlcg8efj53t:/etc/nginx/sites-enabled# cat nip
+log_format logz '$remote_addr [$time_local]'
+                '"$request" $status';
+								
+resolver 8.8.8.8;
+upstream  example {
+     server  example.com;
+}
+
+map $http_user_agent $browser {
+    "~*FireFox"    "firefox";
+     default     "Noname";
+      }
+ 
+server {
+       listen 80 default_server;
+       listen [::]:80 default_server;
+       deny 10.10.10.10;
+       allow all;
+       auth_basic         "Rebrain lnxa 01 03";
+       auth_basic_user_file    /etc/nginx/.htpasswd;
+       access_log /var/log/nginx/nip.access.log logz;
+       server_name 130.193.55.244.nip.io;
+       root /var/www/html;
+#       index index.nginx-debian.html;
+       location / {          
+              index index.nginx-debian.html;
+              try_files  $uri $uri/ =404;
+       }
+       location /rbm_images/ {
+              alias /var/www/rebrain/images/ ;
+            #  try_files $uri $uri/ *;
+              autoindex on;
+       }       
+       location /noauth/ {
+            auth_basic off;
+       }
+       location /example/ {
+            proxy_pass http://example;
+            proxy_set_header Host example.com;
+#            proxy_set_header X-Forwarded-For $remote_addr;
+       }
+
+       location /browser/ {
+          return 200 "Hello, $browser";
+      }
+}
+
+
+root@epdui7glmmlcg8efj53t:/etc/nginx/sites-enabled# htpasswd -c /etc/nginx/.htpasswd rebrain
+New password: 
+Re-type new password: 
+Adding password for user rebrain
+root@epdui7glmmlcg8efj53t:/etc/nginx/sites-enabled# cd ..
+root@epdui7glmmlcg8efj53t:/etc/nginx# cat .htpasswd 
+rebrain:$apr1$7N500azl$5G8WRfCVp2oLw9sZMJ3zy1
+root@epdui7glmmlcg8efj53t:/etc/nginx# 
+
+
+
+Проверка
+130.193.55.244.nip.io/browser/
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 4
+15.06.2022 10:27
+Здравствуйте! С кодом - ок, но клиенту предлагают загрузить файл с текстом сообщения, вместо того чтобы его показать. За действия типа показать/загрузить отвечает специальный заготолок. Посмотрите с помощью curl -v какой заголовок присутствует в текстовых страницах и какой у вас.
+
+16.06.2022 08:35
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+16.06.2022 08:35
+
+84.252.142.5.nip.io/browser/
+
+Вот мой вывод. Все норм выводит. 
+root@epdui7glmmlcg8efj53t:/etc/nginx/sites-enabled# curl -v 84.252.142.5.nip.io/browser/
+*   Trying 84.252.142.5:80...
+* TCP_NODELAY set
+* Connected to 84.252.142.5.nip.io (84.252.142.5) port 80 (#0)
+> GET /browser/ HTTP/1.1
+> Host: 84.252.142.5.nip.io
+> User-Agent: curl/7.68.0
+> Accept: */*
+> 
+* Mark bundle as not supporting multiuse
+< HTTP/1.1 200 OK
+< Server: nginx/1.18.0 (Ubuntu)
+< Date: Thu, 16 Jun 2022 05:34:11 GMT
+< Content-Type: application/octet-stream
+< Content-Length: 14
+< Connection: keep-alive
+< Content-Type: text/plain
+< 
+Hello, Noname
+* Connection #0 to host 84.252.142.5.nip.io left intact
+
+
+root@epdui7glmmlcg8efj53t:/etc/nginx/sites-enabled# cat nip
+log_format logz '$remote_addr [$time_local]'
+                '"$request" $status';
+								
+resolver 8.8.8.8;
+upstream  example {
+     server  example.com;
+}
+
+map $http_user_agent $browser {
+    "~*FireFox"    "firefox";
+     default     "Noname";
+      }
+ 
+server {
+       listen 80 default_server;
+       listen [::]:80 default_server;
+       deny 10.10.10.10;
+       allow all;
+       auth_basic         "Rebrain lnxa 01 03";
+       auth_basic_user_file    /etc/nginx/.htpasswd;
+       access_log /var/log/nginx/nip.access.log logz;
+       server_name 84.252.142.5.nip.io;
+       root /var/www/html;
+#       index index.nginx-debian.html;
+       location / {          
+              index index.nginx-debian.html;
+              try_files  $uri $uri/ =404;
+       }
+       location /rbm_images/ {
+              alias /var/www/rebrain/images/ ;
+            #  try_files $uri $uri/ *;
+              autoindex on;
+       }       
+       location /noauth/ {
+            auth_basic off;
+       }
+       location /example/ {
+            proxy_pass http://example;
+            proxy_set_header Host example.com;
+#            proxy_set_header X-Forwarded-For $remote_addr;
+       }
+
+       location /browser/ {
+          add_header Content-Type text/plain;
+          return 200 "Hello, $browser\n";
+      }
+}
+
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 5
+17.06.2022 00:04
+Здравствуйте, теперь всё отлично!
+
+
+
+*******************************************************************************
+Теория
+*******************************************************************************
+LNXA-01 03: Web. nginx. Conditions, regex
+Описание:
+В этом задании мы завершим наше знакомство с nginx, рассмотрев директивы, которые позволяют влиять на обработку запросов более гибко при помощи условных операторов, переменных, map, а в конце разберем практические советы конфигурирования данного веб-сервера.
+
+set
+В nginx, по аналогии с bash, есть возможность работы с переменными, установка которых производится через директиву set. При помощи этого можно устанавливать переменные, которые далее можно использовать в других директивах или даже отдавать в логах при необходимости. Сама по себе эта директива не так интересна, как в связке с другими, которые позволяют задать логику обработки запросов.
+
+Использование директивы выглядит следующим образом - set $variable_name VALUE. Важно, что имя переменной обязательно должно начинаться со знака $ и дальнейшее обращение к ней производится таким же образом.
+
+При помощи set можно и производить конкатенацию строк, к примеру, set $my_requests "$http_user_agent $request_method"; (в этом примере мы обращаемся к глобальным переменным, которые доступны для всех запросов).
+
+if
+И вновь, как и в bash, директива if позволяет менять результаты запросов - по ним проходит каждый запрос, из-за чего запрос с двух разных устройств может привести к разным результатам. В том числе, внутри if можно устанавливать переменные, исходя из которых может дальше меняться логика работы.
+
+Так, к примеру, можно определить, обращаются ли к серверу из бразуера Firefox при помощи следующего запроса:
+
+if ($http_user_agent ~ Firefox) {
+    set $browser firefox;
+}
+Таким же образом можно делать if за if, строя что-то типа конвейеров обработки.
+
+Но вообще лучше так не делать. Сами разработчики написали прекрасную статью if is evil, в которой описывают, что при неправильном использовании данная директива может привести и вовсе к падению nginx в ходе обработки. В случае использовании set, в целом, проблем не должно быть, но есть и более опасные директивы, которые здесь и могут сыграть злую шутку.
+
+Однако и установка переменных через if - местами оверкилл, поскольку для этого есть более гибкое решение.
+
+map
+Директива map позволяет задать переменную, которая в зависимости от установленного значения в момент обращения к map возвращает определенное значение. В целом, map стоит воспринимать как своеобразную переменную типа ключ-значение, у которой ключ всегда берется из другой переменной.
+
+Так, к примеру, если вы хотите выставить переменную окружения в зависимости от другого значения, можно либо сделать это через if:
+
+if ($arg_one = "one") {
+    set $var_two "two";
+}
+
+if ($arg_one = "three") {
+    set $var_two "four";
+}
+Либо сделать более элегантное решение через map:
+
+map $arg_one $var_two {
+    "one"    "two";
+    "three"  "four";
+}
+Ключом же может выступать не только конкретная переменная, но и вообще какая-то строка, которая составлена из переменных:
+
+map "$browser-$request_method" $arg_one $var_two {
+    "firefox-POST" "ff-post";
+    "firefox-GET"  "ff-get";
+}
+При помощи спецключа default можно установить значение, возвращаемое по умолчанию, расширяя наш пример:
+
+map "$browser-$request_method" $arg_one $var_two {
+    "firefox-POST" "ff-post";
+    "firefox-GET"  "ff-get";
+    default        "ie-any";
+}
+regex
+Кроме использования строковых значений в том же server_name, существует возможность использовать регулярные выражения. На них построена логика работы и некоторых других директив, которые мы разберем.
+
+Начнем мы как раз с использования регулярных выражений в server_name. Пока мы рассматривали только фиксированные строки и wildcard. Для использования регулярных выражений нужно использовать формат ~$regex, где $regex - это нужное нам регулярное выражение.
+
+Пример использования - server_name ~^(?<user>.+)\.example\.net$;.
+
+Кроме того, регулярные выражения можно использовать и в location: location ~* .(png|gif|ico|jpg|jpeg)$ {}. Такое регуляное выражение будет работать на всех изображениях, вне зависимости от остального пути.
+
+Круглые скобки в regex означают группировку, которую можно использовать далее в других запросах. Так, к примеру, в случае с приведенным выше примером использования server_name с регулярным выражением, мы на выходе получим доступную внутри server переменную окружения $user, которую можно использовать, где угодно - set/add_header/proxy_add_header/...
+
+Есть еще одна директива, использование regex в которой очень широко распространено.
+
+rewrite
+Данная директива, в отличие от return, с которой ее часто сравнивают, более гибка и сложна в понимании. Если return просто возвращает одну ссылку с соответствующим HTTP статус-кодом, то rewrite позволяет применять regex на имеющийся location и изменять его как угодно.
+
+Директива имеет следующий синтаксис: rewrite regex URL [flag], где regex - это тот regex, который нужно применить к location (в том числе используя группировку), URL - новый URL, который будет отдан, а flag - опциональный параметр.
+
+Подряд может использоваться несколько директив rewrite, которые будут выполняться последовательно, если иное поведение не определяется флагом.
+
+Существует 4 основных флага:
+
+last - завершает обработку rewrite внутри конкретного location и начинает обработку location, который получился в результате преобразования;
+break - завершает обработку rewrite, но в отличие от last не идет дальше по location;
+permanent - вызывает редирект с кодом 301;
+redirect - вызывает редирект с кодом 302.
+Данная директива является очень гибким инструментом, который может использоваться в связке с директивой proxy_pass, меняя тот путь, который отправляется в сторону целевого сервера. К примеру:
+
+location  /test {
+  rewrite /test/(.*) /$1  break;
+  proxy_pass         http://localhost:3200;
+  proxy_redirect     off;
+  proxy_set_header   Host $host;
+}
+Теперь перейдем к более сложным вопросам, связанным с работой nginx. А начнем, пожалуй, с того, в какой последовательности обрабатываются директивы location в зависимости от используемого формата задания URI. Для этого рассмотрим полную форму директивы location:
+
+location [optional_modifier] location_match {
+  location-body;
+}
+Если с location_match все более-менее понятно, то с optional_modifier - надо разбираться. Возможные значения:
+
+никакого модификатора (далее - prefix) - означает, что данный location_match определяется как prefix. Проверка соответствия location идет с начала URI.
+= (далее - exact) - определяет точный URI, который должен быть использован. К примеру, location = /test/ будет обрабатывать только путь /test/, но /test/one уже не будет.
+~ (далее - case-sensitive regex) - определяет, совпадает ли location по regex, но следит, чтобы регистр был соблюден.
+~* (далее - case-insensitive regex) - определяет, совпадает ли location по regex, вне зависимости от регистра.
+^~ (далее - prority prefix) - определяет, что если значение подошло по префиксу, указанному в аргументе (без regex!), то все остальные regex, по которым мог бы пройти nginx, будут игнорироваться.
+Алгоритм выбора следующий:
+
+Соответствие = (exact)
+Максимальный по длине подходящий префиксный ( или `^~)
+Регулярные выражения (~ и ~*) сверху вниз (в случае соответствия нескольким, будет выбрано то, которое выше по списку)
+Данный порядок иногда сложно запомнить, но запомнить его стоит. В случае, если вы не уверены в своем выборе, можно обратиться к тестерам location.
+
+Отдельной историей является определение в случае вложенных location (да, так можно), но без крайней необходимости не стоит приходить к вложенности location, так как это сильно усложняет читаемость конфигурационного файла.
+
+Теперь рассмотрим, какие возможности нам дает сама команда nginx. Мы уже разобрали флаг, который выводит всю информацию о самом nginx, но есть и несколько других полезных флагов:
+
+-t - позволяет протестировать корректность конфигурационного файла. Позволяет быть уверенным, что в ходе рестарта nginx вообще запустится.
+-s $SIGNAL - позволяет отправить master процессу nginx сигнал для выполнения определенных действий. Существует 4 основных сигнала:
+stop - останавливает nginx быстро, сродни использованию 9 сигнала через kill;
+quit - останавливает nginx мягко, сродни использованию 15 сигнала через kill;
+reopen - переоткрывает файлы с логами, создавая новый файл, если он уже не существует. В основном используется при ротации логов;
+reload - позволяет без выключения сервера перечитать конфигурационный файл, применяя изменения.
+Вместо последнего ключа можно использовать kill по master процессу, которому соответствуют сигналы (TERM/INT, QUIT, HUP и USR1, соответственно).
+
+При проксировании запросов через proxy_pass на HTTPS страницы у nginx по умолчанию есть особенность работы - он не проверяет SSL сертификат того, к кому обращается. В некоторых случаях (к примеру, в частных сетях, где используются самоподписанные сертификаты) это бывает очень полезно, но об этом надо помнить, когда вы проверяете доступность того же хоста через, скажем, curl или какую-то библиотеку в языках программирования и получаете ошибку.
+
+Вернемся на секунду к директиве listen и ее опции default_server - мы рекомендуем использовать ее с высшим приоритетом над остальными конфигами и, по возможности, не перегружать ее логикой. Наиболее частые случаи использовая данной директивы мы разберем в следующих заданиях, но пока опишем самый частый - отказ от запроса со стороны клиента со специальным HTTP кодом 444, который просто закрывает соединение. Конфиг для такого решения выглядит следующим образом:
+
+server {
+    listen      80 default_server;
+    server_name "";
+    return      444;
+}
+Повторимся, что желательно, чтобы данный server был первым в очереди, чтобы по случайности не было обращения к другим server.
+
+Возвратимся к директиве include. Ее, в целом, можно использовать в любом месте и не один раз. Это позволяет создавать наборы директив, которые могут использоваться по несколько раз в разных местах и просто подключать их, не копируя их.
+
+Напоследок лишь скажем, что и без того большие возможности nginx можно расширять при помощи кода на двух языках - Perl и Lua (на самом деле есть и другие языки, в том числе JS, но в ввиду распространения, расскажем лишь про эти два).
+
+Perl имеет статус официально поддерживаемого языка и содержится в пакете nginx-full (вместе с большим количеством других модулей), а Lua распространяется как отдельный модуль, но при этом сильно развивается в ответвлении от nginx - OpenResty.
+
+Данные решения позволяют сильно расширить функциональность сервера при помощи полноценного языка программирования, вплоть до реализации сложных вещей, типа блокировки пользователей по конкретным запросам или работы с базами данных.
+
+Еще одной удобной возможностью nginx является использование nginx в роли сервера раздачи файлов, где при входе по ссылке мы получаем содержимое директории, на которую указывает location. Эта возможность включается при помощи директивы autoindex on;. Чаще всего ее применяют к конкретному location, но, в целом, можно применять даже на уровне http.
+
