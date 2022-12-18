@@ -1,0 +1,462 @@
+Задание:
+На локальном сервере выполните команду lsscsi.
+На локальном сервере настройте target для подключения диска со следующими параметрами: 1.1. Разрешить подключение только с одного IP-адреса. 1.2. Настроить доступ по логину и паролю rebrainme/Passw0rd.
+Выполните команды tgtadm --mode target --op show, iscsiadm -m session -P2 и lsscsi.
+Отправьте на проверку все полученные выводы и конфигурационные файлы.
+
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+28.11.2022 06:56
+1. На локальном сервере выполните команду lsscsi.
+apt update
+apt install lsscsi
+root@ubuntu-server:/home/max# lsscsi
+[1:0:0:0]    cd/dvd  VBOX     CD-ROM           1.0   /dev/sr0 
+[2:0:0:0]    disk    ATA      VBOX HARDDISK    1.0   /dev/sda 
+[3:0:0:0]    disk    ATA      VBOX HARDDISK    1.0   /dev/sdb 
+
+
+2. На локальном сервере настройте target для подключения диска со следующими параметрами: 1.1. Разрешить подключение только с одного IP-адреса. 1.2. Настроить доступ по логину и паролю rebrainme/Passw0rd.
+apt install tgt
+root@ubuntu-server:/home/max# systemctl status tgt
+● tgt.service - (i)SCSI target daemon
+     Loaded: loaded (/lib/systemd/system/tgt.service; enabled; vendor preset: e>
+     Active: active (running) since Mon 2022-11-28 03:01:51 UTC; 22s ago
+       Docs: man:tgtd(8)
+   Main PID: 2490 (tgtd)
+     Status: "Starting event loop..."
+      Tasks: 1
+     Memory: 1.6M
+     CGroup: /system.slice/tgt.service
+             └─2490 /usr/sbin/tgtd -f
+
+Nov 28 03:01:51 ubuntu-server systemd[1]: Starting (i)SCSI target daemon...
+Nov 28 03:01:51 ubuntu-server tgtd[2490]: tgtd: iser_ib_init(3431) Failed to in>
+Nov 28 03:01:51 ubuntu-server tgtd[2490]: tgtd: work_timer_start(146) use timer>
+Nov 28 03:01:51 ubuntu-server tgtd[2490]: tgtd: bs_init(387) use signalfd notif>
+Nov 28 03:01:51 ubuntu-server systemd[1]: Started (i)SCSI target daemon.
+
+vi /etc/tgt/conf.d/rebrainme.conf
+<target iqn.2022-11.max.efoshkin.ru:rebrainme>
+        backing-store /dev/sdb
+        initiator-address 192.168.0.12
+        incominguser rebrainme Passw0rd
+</target>
+systemctl restart tgt
+
+3. Выполните команды tgtadm --mode target --op show, iscsiadm -m session -P2 и lsscsi.
+root@ubuntu-server:/etc/tgt/conf.d# tgtadm --mode target --op show
+Target 1: iqn.2022-11.max.efoshkin.ru:rebrainme
+    System information:
+        Driver: iscsi
+        State: ready
+    I_T nexus information:
+    LUN information:
+        LUN: 0
+            Type: controller
+            SCSI ID: IET     00010000
+            SCSI SN: beaf10
+            Size: 0 MB, Block size: 1
+            Online: Yes
+            Removable media: No
+            Prevent removal: No
+            Readonly: No
+            SWP: No
+            Thin-provisioning: No
+            Backing store type: null
+            Backing store path: None
+            Backing store flags: 
+        LUN: 1
+            Type: disk
+            SCSI ID: IET     00010001
+            SCSI SN: beaf11
+            Size: 5369 MB, Block size: 512
+            Online: Yes
+            Removable media: No
+            Prevent removal: No
+            Readonly: No
+            SWP: No
+            Thin-provisioning: No
+            Backing store type: rdwr
+            Backing store path: /dev/sdb
+            Backing store flags: 
+    Account information:
+        rebrainme
+    ACL information:
+        192.168.0.14
+
+Думаю нужно настроить initiator хоть этого в задании и не указано.
+И так ставим
+apt-get install open-iscsi
+vi /etc/iscsi/initiatorname.iscsi
+InitiatorName=iqn.2022-11.max.efoshkin.ru:rebrainme
+Настраиваем авторизацию
+vi /etc/iscsi/iscsid.conf
+# *************
+# CHAP Settings
+# *************
+
+# To enable CHAP authentication set node.session.auth.authmethod
+# to CHAP. The default is None.
+node.session.auth.authmethod = CHAP
+
+# To set a CHAP username and password for initiator
+# authentication by the target(s), uncomment the following lines:
+node.session.auth.username = rebrainme
+node.session.auth.password = Passw0rd
+
+Применяем настройки
+systemctl restart iscsid open-iscsi 
+
+
+
+Коннектимся
+root@ubuntu-server:/etc/iscsi# iscsiadm -m discovery -t sendtargets -p 192.168.0.13
+192.168.0.13:3260,1 iqn.2022-11.max.efoshkin.ru:rebrainme
+
+Кстати хочу сказать что авторизация по IP адресу работает, когда я указал в на таргите  другой айпи initiator-address 192.168.0.14, он не давал его найти
+iscsiadm -m discovery -t sendtargets -p 192.168.0.13
+iscsiadm: No portals found
+
+iscsiadm -m node -o show 
+# BEGIN RECORD 2.0-874
+node.name = iqn.2022-11.max.efoshkin.ru:rebrainme
+node.tpgt = 1
+node.startup = manual
+node.leading_login = No
+iface.hwaddress = <empty>
+iface.ipaddress = <empty>
+iface.iscsi_ifacename = default
+iface.net_ifacename = <empty>
+iface.gateway = <empty>
+iface.subnet_mask = <empty>
+iface.transport_name = tcp
+iface.initiatorname = <empty>
+iface.state = <empty>
+iface.vlan_id = 0
+iface.vlan_priority = 0
+iface.vlan_state = <empty>
+iface.iface_num = 0
+iface.mtu = 0
+iface.port = 0
+iface.bootproto = <empty>
+iface.dhcp_alt_client_id_state = <empty>
+iface.dhcp_alt_client_id = <empty>
+iface.dhcp_dns = <empty>
+iface.dhcp_learn_iqn = <empty>
+iface.dhcp_req_vendor_id_state = <empty>
+iface.dhcp_vendor_id_state = <empty>
+iface.dhcp_vendor_id = <empty>
+iface.dhcp_slp_da = <empty>
+iface.fragmentation = <empty>
+iface.gratuitous_arp = <empty>
+iface.incoming_forwarding = <empty>
+iface.tos_state = <empty>
+iface.tos = 0
+iface.ttl = 0
+iface.delayed_ack = <empty>
+iface.tcp_nagle = <empty>
+iface.tcp_wsf_state = <empty>
+iface.tcp_wsf = 0
+iface.tcp_timer_scale = 0
+iface.tcp_timestamp = <empty>
+iface.redirect = <empty>
+iface.def_task_mgmt_timeout = 0
+iface.header_digest = <empty>
+iface.data_digest = <empty>
+iface.immediate_data = <empty>
+iface.initial_r2t = <empty>
+iface.data_seq_inorder = <empty>
+iface.data_pdu_inorder = <empty>
+iface.erl = 0
+iface.max_receive_data_len = 0
+iface.first_burst_len = 0
+iface.max_outstanding_r2t = 0
+iface.max_burst_len = 0
+iface.chap_auth = <empty>
+iface.bidi_chap = <empty>
+iface.strict_login_compliance = <empty>
+iface.discovery_auth = <empty>
+iface.discovery_logout = <empty>
+node.discovery_address = 192.168.0.13
+node.discovery_port = 3260
+node.discovery_type = send_targets
+node.session.initial_cmdsn = 0
+node.session.initial_login_retry_max = 8
+node.session.xmit_thread_priority = -20
+node.session.cmds_max = 128
+node.session.queue_depth = 32
+node.session.nr_sessions = 1
+node.session.auth.authmethod = CHAP
+node.session.auth.username = rebrainme
+node.session.auth.password = ********
+node.session.auth.username_in = <empty>
+node.session.auth.password_in = <empty>
+node.session.timeo.replacement_timeout = 120
+node.session.err_timeo.abort_timeout = 15
+node.session.err_timeo.lu_reset_timeout = 30
+node.session.err_timeo.tgt_reset_timeout = 30
+node.session.err_timeo.host_reset_timeout = 60
+node.session.iscsi.FastAbort = Yes
+node.session.iscsi.InitialR2T = No
+node.session.iscsi.ImmediateData = Yes
+node.session.iscsi.FirstBurstLength = 262144
+node.session.iscsi.MaxBurstLength = 16776192
+node.session.iscsi.DefaultTime2Retain = 0
+node.session.iscsi.DefaultTime2Wait = 2
+node.session.iscsi.MaxConnections = 1
+node.session.iscsi.MaxOutstandingR2T = 1
+node.session.iscsi.ERL = 0
+node.session.scan = auto
+node.conn[0].address = 192.168.0.13
+node.conn[0].port = 3260
+node.conn[0].startup = manual
+node.conn[0].tcp.window_size = 524288
+node.conn[0].tcp.type_of_service = 0
+node.conn[0].timeo.logout_timeout = 15
+node.conn[0].timeo.login_timeout = 15
+node.conn[0].timeo.auth_timeout = 45
+node.conn[0].timeo.noop_out_interval = 5
+node.conn[0].timeo.noop_out_timeout = 5
+node.conn[0].iscsi.MaxXmitDataSegmentLength = 0
+node.conn[0].iscsi.MaxRecvDataSegmentLength = 262144
+node.conn[0].iscsi.HeaderDigest = None
+node.conn[0].iscsi.DataDigest = None
+node.conn[0].iscsi.IFMarker = No
+node.conn[0].iscsi.OFMarker = No
+# END RECORD
+
+
+iscsiadm -m node --login 
+Logging in to [iface: default, target: iqn.2022-11.max.efoshkin.ru:rebrainme, portal: 192.168.0.13,3260] (multiple)
+Login to [iface: default, target: iqn.2022-11.max.efoshkin.ru:rebrainme, portal: 192.168.0.13,3260] successful.
+
+iscsiadm -m session -o show 
+tcp: [1] 192.168.0.13:3260,1 iqn.2022-11.max.efoshkin.ru:rebrainme (non-flash)
+
+
+iscsiadm -m session -P2
+Target: iqn.2022-11.max.efoshkin.ru:rebrainme (non-flash)
+	Current Portal: 192.168.0.13:3260,1
+	Persistent Portal: 192.168.0.13:3260,1
+		**********
+		Interface:
+		**********
+		Iface Name: default
+		Iface Transport: tcp
+		Iface Initiatorname: iqn.2022-11.max.efoshkin.ru:rebrainme
+		Iface IPaddress: 192.168.0.12
+		Iface HWaddress: <empty>
+		Iface Netdev: <empty>
+		SID: 1
+		iSCSI Connection State: LOGGED IN
+		iSCSI Session State: LOGGED_IN
+		Internal iscsid Session State: NO CHANGE
+		*********
+		Timeouts:
+		*********
+		Recovery Timeout: 120
+		Target Reset Timeout: 30
+		LUN Reset Timeout: 30
+		Abort Timeout: 15
+		*****
+		CHAP:
+		*****
+		username: rebrainme
+		password: ********
+		username_in: <empty>
+		password_in: ********
+		************************
+		Negotiated iSCSI params:
+		************************
+		HeaderDigest: None
+		DataDigest: None
+		MaxRecvDataSegmentLength: 262144
+		MaxXmitDataSegmentLength: 8192
+		FirstBurstLength: 65536
+		MaxBurstLength: 262144
+		ImmediateData: Yes
+		InitialR2T: Yes
+		MaxOutstandingR2T: 1
+
+lsscsi
+[1:0:0:0]    cd/dvd  VBOX     CD-ROM           1.0   /dev/sr0 
+[2:0:0:0]    disk    ATA      VBOX HARDDISK    1.0   /dev/sda 
+[3:0:0:0]    disk    ATA      VBOX HARDDISK    1.0   /dev/sdb 
+[4:0:0:0]    storage IET      Controller       0001  -        
+[4:0:0:1]    disk    IET      VIRTUAL-DISK     0001  /dev/sdc 
+
+lsblk | grep sdc
+sdc                         8:32   0    5G  0 disk 
+
+cat /proc/partitions | grep sdc
+   8       32    5242880 sdc
+	 
+Решил донастроить монтирование
+parted --script /dev/sdc "mklabel gpt"
+parted --script /dev/sdc "mkpart primary 0% 100%"
+mkfs.xfs /dev/sdc1
+mkfs.xfs -f /dev/sdc1
+meta-data=/dev/sdc1              isize=512    agcount=4, agsize=327552 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1
+data     =                       bsize=4096   blocks=1310208, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+root@ubuntu-server:/etc/iscsi# 
+
+mount /dev/sdc1 /mnt
+df -h | grep sdc1
+/dev/sdc1                          5.0G   68M  5.0G   2% /mnt
+
+touch files
+root@ubuntu-server:/mnt# ll
+total 4
+drwxr-xr-x  2 root root   19 Nov 28 03:51 ./
+drwxr-xr-x 19 root root 4096 Nov 12 19:52 ../
+-rw-r--r--  1 root root    0 Nov 28 03:51 files
+
+
+dd if=/dev/zero of=large-file bs=1024 count=1024
+1024+0 records in
+1024+0 records out
+1048576 bytes (1.0 MB, 1.0 MiB) copied, 0.0112912 s, 92.9 MB/s
+
+ll -h
+total 1.1M
+drwxr-xr-x  2 root root   37 Nov 28 03:52 ./
+drwxr-xr-x 19 root root 4.0K Nov 12 19:52 ../
+-rw-r--r--  1 root root    0 Nov 28 03:51 files
+-rw-r--r--  1 root root 1.0M Nov 28 03:52 large-file
+
+Помог мануал по настройке таргета
+https://techviewleo.com/configure-iscsi-target-on-ubuntu/
+и инициатора
+https://techviewleo.com/configure-iscsi-initiator-on-ubuntu/
+
+
+Стала понятна роль iscsi, типа это нужно для СХД в кластерных решениях. В мелких решениях достаточно НАСА в виде нфс или самбы.
+К примеру для виртуализации самба или нфс не пригодятся а iscsi пригодится. 
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+28.11.2022 10:12
+Добрый день!
+
+"Кстати хочу сказать что авторизация по IP адресу работает, когда я указал в на таргите другой айпи initiator-address 192.168.0.14, он не давал его найти" - все верно, ожидаемое поведение.
+
+"Стала понятна роль iscsi, типа это нужно для СХД в кластерных решениях. В мелких решениях достаточно НАСА в виде нфс или самбы" - на самом деле разница между блочным и файловым доступом, все зависит от решаемых задач. Если Вам нужна своя файловая система со своими параметрами, то кроме блочного доступа альтернативы не будет.
+
+Другое дело, что для нормального iSCSI рекомендуют: а) выделенную сеть/влан, б) повышенный размер MTU.
+
+"К примеру для виртуализации самба или нфс не пригодятся а iscsi пригодится" - SMB - да, а вот NFS успешно используется, для VMWare есть исследования, которые утверждают, что производительность данного решения не меньше.
+
+Отличные знание темы и выполнение задания, хорошо что пробуете все практически, разбираетесь с вариантами, замечаний и вопросов нет!
+
+
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+
+LNXA-09 04: Storage. iSCSI
+Описание:
+iSCSI (Internet Small Computer System Interface) — протокол, который позволяет обмениваться SCSI командами по протоколу TCP/IP и используется для предоставления доступа к блочным устройствам другим системам. Стандарт этого протокола описан в RFC 7143 и в основном включает механизм инкапсуляции SCSI команд в IP-сети и транспортный механизм для SCSI в TCP.
+
+Существует два основных метода для предоставления доступа к данным, расположенным на другом физическом сервере:
+
+NAS (Network Attached Storage) — удаленный сервер предоставляет доступ к файлам (например, NFS и Samba (CIFS) использует такой подход).
+SAN (Storage Area Network) — удаленный сервер предоставляет доступ к блочному устройству. Клиент использует блочное устройство напрямую, а сервер ничего не знает про файлы (и файловую систему) на нем.
+По названию SAN подразуемает выделенную сеть до хранилища, но в сообществе так закрепилось, что NAS — это файлы, а SAN — блочные устройства. iSCSI как раз является протоколом, предоставляющим доступ к блочным устройствам.
+
+Терминология iSCSI во многом похожа на SCSI и содержит следующие термины:
+
+target — сервер, предоставляющий доступ к блочному устройству, которое может делиться на несколько LUN;
+initiator — клиент, использующий блочные устройуства;
+LUN — номер «части» диска, к которому идет обращение внутри target;
+IQN — полное имя узла (target или initiator). Очень похоже на DNS;
+portal — группы target, которые анонсируются вместе.
+Серверная часть настраивается с помощью пакета tgt (Target Framework). target оперирует блочным устройством, он прикрепляет к нему имя и LUN, а также публикует его. Это позволяет initiator подключаться к устройству с авторизацией и без. target конфигурируется с помощью конфигурационного файла /etc/tgt/targets.conf. В общем случае там содержится строка include /etc/tgt/conf.d/*.conf, которая позволяет конфигурировать отдельные таргеты в зависимости от потребностей. Ниже приведен пример конфигурации:
+
+# cat /etc/tgt/conf.d/rebrainme.conf
+<target iqn.2020-11.com.rebrainme:test>
+backing-store /dev/sdbg
+</target>
+Первая строка описывает IQN в формате, содержащем поля:
+
+буквенная аббревиатура iqn;
+дата в формате год-месяц, когда блок присвоения имен завладел доменом;
+имя домена в обратном порядке;
+имя хранилища.
+Вторая строка содержит блочное устройство (в данном случае жесткий диск, но можно использовать и lvm). После перезагрузки tgt можно убедиться, что конечное устройство iSCSI было доступно в соответствии с созданным файлом конфигурации:
+
+Target 1: iqn.2020-11.com.rebrainme:test # target
+    System information:
+        Driver: iscsi
+        State: ready
+    I_T nexus information: # информация о инициаторах (в данный момент пусто, т.к. клиентов нет)
+    LUN information:
+        LUN: 1
+            Type: disk
+            SCSI ID: IET     00010001
+            SCSI SN: beaf11
+            Size: 14000520 MB, Block size: 512 # размер диска
+            Online: Yes
+            Removable media: No
+            Prevent removal: No
+            Readonly: No
+            SWP: No
+            Thin-provisioning: No
+            Backing store type: rdwr
+            Backing store path: /dev/sdbg # блочное устройство
+            Backing store flags: 
+    Account information:
+    ACL information:
+        ALL
+В качестве инициатора будем использовать пакет open-iscsi. Работу этого пакета можно разделить на три этапа.
+
+Поиск таргетов (discovery). Этот этап запоминает все найденные таргеты, записывая в директорию /etc/iscsi/send_targets/. Удалить таргет можно, удалив соответствующий файл с файловой системы, или командой iscsiadm -m node --op delete. Это бывает нужно после неудачных экспериментов с настройками.
+# iscsiadm -m discovery -t st -p 2a02:6b8:c03:794:0:41af:f292:91c7
+[2a02:6b8:c03:794:0:41af:f292:91c7]:3260,1 iqn.2020-11.com.rebrainme:test
+Подключение к таргету. open-iscsi держит сессию открытой, даже если блочное устройство не используется, а также некоторое время при перезагрузке сервера.
+# iscsiadm -m node
+[2a02:6b8:c03:794:0:41af:f292:91c7]:3260,1 iqn.2020-11.com.rebrainme:test
+# iscsiadm -m node -l -T iqn.2020-11.com.rebrainme:test
+Logging in to [iface: default, target: iqn.2020-11.com.rebrainme:test, portal: 2a02:6b8:c03:794:0:41af:f292:91c7,3260] (multiple)
+Login to [iface: default, target: iqn.2020-11.com.rebrainme:test, portal: 2a02:6b8:c03:794:0:41af:f292:91c7,3260] successful.
+# iscsiadm -m session
+tcp: [2] [2a02:6b8:c03:794:0:41af:f292:91c7]:3260,1 iqn.2020-11.com.rebrainme:test
+Работа с подключенным таргетом. Операции отключения/удаления таргета, работа с блочным устройством. После подключения таргета блочное устройство доступно в системе. Найдем его с помощью команды lsscsi.
+# lsscsi  |grep VIRTUAL
+[9:0:0:1]    disk    IET      VIRTUAL-DISK     0001  /dev/sdbl
+После подключения инициатора еще раз выполним команду tgtadm --mode target --op show:
+
+Target 1: iqn.2020-11.com.rebrainme:test
+    System information:
+        Driver: iscsi
+        State: ready
+    I_T nexus information:
+        I_T nexus: 1
+            Initiator: iqn.1993-08.org.debian:01:214d66cfd636 alias: s326myt.storage.yandex.net # IQN адрес инициатора
+            Connection: 0
+                IP Address: 2a02:6b8:c03:794:0:41af:570f:9233 # IP адрес инициатора
+...
+После подключения блочного устройства на инициаторе его можно использовать с помощью стандартных средств системы.
+
+Еще одной полезной особенностью iSCSI является поддержка mulitpath — нескольких маршрутов к источнику. Сам open-iscsi не поддерживает подключение по нескольким IP к одному серверу (это приведет к появлению нескольких блочных устройств). Но демон multipathd позволяет найти диски с одинаковым идентификатором и обработать их в multipath с настраиваемыми политиками.
+
+Полезные ссылки:
+RFC 7143
+iSCSI
