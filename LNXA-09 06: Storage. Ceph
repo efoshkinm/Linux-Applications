@@ -1,0 +1,859 @@
+Задание:
+Настройте Ceph кластер из двух OSD дисков, расположенных на локальном и удаленном серверах.
+Выполните команды ceph health и ceph -s на удаленном сервере.
+Добавьте в кластер еще по одному диску с локального и удаленного серверов.
+Выполните команды ceph health и ceph -s на удаленном сервере.
+Выставите размер пулов из команды ceph osd pool stats, равный двум. Выведите результат ceph -s.
+Создайте пул rebrainme.
+Запишите файл ceph-rebrainme-4M размером 4MiB и файл ceph-rebrainme-44M размером 44MiB в пул rebrainme.
+Выведите результат команды rados df.
+
+
+
+****************************************************************************
+Решение
+****************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+30.11.2022 10:24
+1. Настройте Ceph кластер из двух OSD дисков, расположенных на локальном и удаленном серверах.
+address: 130.193.42.67
+
+Создаем дополнительный жесткий диск на удаленной машине 
+ yc compute disk create --zone ru-central1-b --size=20 ceph-disk
+done (8s)
+id: epd9n74uu90gigk42qi2
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-11-30T03:48:07Z"
+name: ceph-disk
+type_id: network-hdd
+zone_id: ru-central1-b
+size: "21474836480"
+block_size: "4096"
+status: READY
+disk_placement_policy: {}
+
+Добавляем жесткий диск к удаленной виртуалке
+yc compute instance attach-disk --name efoshkin-lnxa-09-06 --disk-name ceph-disk
+
+Добавил жесткий диск на локальную виртуальную машину.
+в размере 20Гб. 
+
+Опять же, из-за того что сервер удаленный, подниму впн.
+remote host
+root@epdijp56kgen003qh9np:/etc/tinc/ceph# ll
+total 28
+drwxr-xr-x 3 root root 4096 Nov 30 04:11 ./
+drwxr-xr-x 3 root root 4096 Nov 30 04:08 ../
+drwxr-xr-x 2 root root 4096 Nov 30 04:17 hosts/
+-rw------- 1 root root 3248 Nov 30 04:11 rsa_key.priv
+-rw-r--r-- 1 root root   62 Nov 30 04:09 tinc.conf
+-rwxr-xr-x 1 root root   71 Nov 30 04:10 tinc-down*
+-rwxr-xr-x 1 root root   69 Nov 30 04:10 tinc-up*
+root@epdijp56kgen003qh9np:/etc/tinc/ceph# cat tinc.conf 
+Name = ceph_remote
+AddressFamily = ipv4
+Device = /dev/net/tun
+root@epdijp56kgen003qh9np:/etc/tinc/ceph# cat tinc-up 
+ip link set $INTERFACE up
+ip addr add 192.168.10.1/24 dev $INTERFACE
+root@epdijp56kgen003qh9np:/etc/tinc/ceph# cat tinc-down
+ip addr del 192.168.10.1/24 dev $INTERFACE
+ip link set $INTERFACE down
+root@epdijp56kgen003qh9np:/etc/tinc/ceph# cat hosts/ceph_remote 
+Address = 130.193.42.67
+Subnet = 192.168.10.1
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEA2c3CKRxlyNhRBtfDBWCEtOniHCBhBZdm2c7JqFJHBSZxiUv/BOym
+uIb3Et7hPbE+c5bN2B1fqFTkp8KceQnMzlx0aheOPUsx0rppu6N2j4v68MPXGNna
+pA+ki259foKDBr+SZYWscBTcsDLCM41Yz5Mycq6AVlesgOz+5kaPyKjSivEDr/25
+4aDuuMrTyBrywhyuczoltOrJG0J0NMqPMro3Qi+tKLfLf+hAH6pK8HloU7ze8rZm
+/9Ni1ieETIvxRlDvVC+d8OGi9AsJkK5qBVKcBmIXOAEh9L2ugguNu4BQH9FuiwHJ
+pJGBKHnztG1rvSDNPM1RDggXEkT+DnCoMVros+jLy2tq0ogLW6T993mOGcVN3PxW
+KdRgR1gB3ejHMuB9kJVp1r4OoluSkYkNRTsKCkfLi/ix17Bgx64dxi1I/tbHGI/X
+2O2oVS041NRfQlt68a0nXcrSbXSKhrOkPqKVhY2xYGH3wtbFWRpHCqSSHB3J/K5u
+sbl1xalTja9IbeXBit/pwFOk405j4MkzpkBkXE9kxr+uWtFxdisCozRd7UAb4ewh
+Kkhmt8j2QEZZfWZI6AK5DP12o0nbgPmOqFFUvF1HdUcLGIN02wk+KibtzEM3egJb
+X+9hR8lPOeGgXPZhr2HxISiy8Bg9IgNaH48ZxMA0TRK/jhCNMbf0+V0CAwEAAQ==
+-----END RSA PUBLIC KEY-----
+root@epdijp56kgen003qh9np:/etc/tinc/ceph# cat hosts/ceph_local 
+Address = 195.16.40.90
+Subnet = 192.168.10.2
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEA+zLQgho+d1P31biW/CGelXPVYqROcyIt2NFqytb0ESKb9c5TWE23
+Q+6BulMz8aBhl8eYT7+V6lgjmD66SUdfTI6azc1rVukclZiOL9M+hwr47KkPcxl6
+BsjAd6IXsBqDWVBB4mG/wkdlgYT3S/6OkjLDgwUxx6c5McYQcuflQvg6jtTqp26Q
+C2WeCCgkLe37i+MxgE7iviOT2qUOpjZAUVlWthfgf22HzNYPbUiOHHmtpEmPxpIb
+uRrpW1w1pfkdH5YyuTAp92FdWBqMJIXiEzJ8pg07EDk+HpaC1FDclKGTdd6iNNR6
+K8uAk8OWHuJ4joTV0g8GgIdfXU66cItQdFhLqG4k6d6nl+2KeSnCz3VYnkuVCiHW
+h9LgQwIqxX/0KkOzQ53JAryZwXqjeqax8ec7Suv0jYEDq8+UuEI3kkCu6M4+Y/tJ
+YdFLKnCRz8lVnpQFT2W6FaiEZlDlZ1mkDcmuS6PPGrxlqz/OphMeKJ6rr9qVmX8q
++AjZ59SkFX5zBnPeRWNz5/1Y20AduAx1fJ2045yimGdTHOqhDKMwxFSaEM3oOSoj
+7ETr6QxQuBQ2lUgROi2CoT/IdLn/FkfOucDSCZBSt8MFvVPfY72hGbGBlSdmnJZu
+R5XqMeJaTC4rVtqEFalqUvBQyFILl0C4K5zAlGsQyzgZmU8QAYHa4O0CAwEAAQ==
+-----END RSA PUBLIC KEY-----
+ 
+root@epdijp56kgen003qh9np:/etc/tinc/ceph# 
+
+
+Tinc lcoal host
+root@ubuntu-server:/etc/tinc/ceph# ll
+total 28
+drwxr-xr-x 3 root root 4096 Nov 30 04:15 ./
+drwxr-xr-x 4 root root 4096 Nov 30 04:08 ../
+drwxr-xr-x 2 root root 4096 Nov 30 04:17 hosts/
+-rw------- 1 root root 3244 Nov 30 04:15 rsa_key.priv
+-rw-r--r-- 1 root root   85 Nov 30 04:14 tinc.conf
+-rwxr-xr-x 1 root root   71 Nov 30 04:15 tinc-down*
+-rwxr-xr-x 1 root root   69 Nov 30 04:14 tinc-up*
+root@ubuntu-server:/etc/tinc/ceph# cat tinc.conf 
+Name = ceph_local
+ConnectTo = ceph_remote
+Device = /dev/net/tun
+AddressFamily = ipv4
+root@ubuntu-server:/etc/tinc/ceph# cat tinc-up 
+ip link set $INTERFACE up
+ip addr add 192.168.10.2/24 dev $INTERFACE
+root@ubuntu-server:/etc/tinc/ceph# cat tinc-down 
+ip addr del 192.168.10.2/24 dev $INTERFACE
+ip link set $INTERFACE down
+root@ubuntu-server:/etc/tinc/ceph# cat hosts/ceph_remote 
+Address = 130.193.42.67
+Subnet = 192.168.10.1
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEA2c3CKRxlyNhRBtfDBWCEtOniHCBhBZdm2c7JqFJHBSZxiUv/BOym
+uIb3Et7hPbE+c5bN2B1fqFTkp8KceQnMzlx0aheOPUsx0rppu6N2j4v68MPXGNna
+pA+ki259foKDBr+SZYWscBTcsDLCM41Yz5Mycq6AVlesgOz+5kaPyKjSivEDr/25
+4aDuuMrTyBrywhyuczoltOrJG0J0NMqPMro3Qi+tKLfLf+hAH6pK8HloU7ze8rZm
+/9Ni1ieETIvxRlDvVC+d8OGi9AsJkK5qBVKcBmIXOAEh9L2ugguNu4BQH9FuiwHJ
+pJGBKHnztG1rvSDNPM1RDggXEkT+DnCoMVros+jLy2tq0ogLW6T993mOGcVN3PxW
+KdRgR1gB3ejHMuB9kJVp1r4OoluSkYkNRTsKCkfLi/ix17Bgx64dxi1I/tbHGI/X
+2O2oVS041NRfQlt68a0nXcrSbXSKhrOkPqKVhY2xYGH3wtbFWRpHCqSSHB3J/K5u
+sbl1xalTja9IbeXBit/pwFOk405j4MkzpkBkXE9kxr+uWtFxdisCozRd7UAb4ewh
+Kkhmt8j2QEZZfWZI6AK5DP12o0nbgPmOqFFUvF1HdUcLGIN02wk+KibtzEM3egJb
+X+9hR8lPOeGgXPZhr2HxISiy8Bg9IgNaH48ZxMA0TRK/jhCNMbf0+V0CAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+root@ubuntu-server:/etc/tinc/ceph# cat hosts/ceph_local 
+Address = 195.16.40.90
+Subnet = 192.168.10.2
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEA+zLQgho+d1P31biW/CGelXPVYqROcyIt2NFqytb0ESKb9c5TWE23
+Q+6BulMz8aBhl8eYT7+V6lgjmD66SUdfTI6azc1rVukclZiOL9M+hwr47KkPcxl6
+BsjAd6IXsBqDWVBB4mG/wkdlgYT3S/6OkjLDgwUxx6c5McYQcuflQvg6jtTqp26Q
+C2WeCCgkLe37i+MxgE7iviOT2qUOpjZAUVlWthfgf22HzNYPbUiOHHmtpEmPxpIb
+uRrpW1w1pfkdH5YyuTAp92FdWBqMJIXiEzJ8pg07EDk+HpaC1FDclKGTdd6iNNR6
+K8uAk8OWHuJ4joTV0g8GgIdfXU66cItQdFhLqG4k6d6nl+2KeSnCz3VYnkuVCiHW
+h9LgQwIqxX/0KkOzQ53JAryZwXqjeqax8ec7Suv0jYEDq8+UuEI3kkCu6M4+Y/tJ
+YdFLKnCRz8lVnpQFT2W6FaiEZlDlZ1mkDcmuS6PPGrxlqz/OphMeKJ6rr9qVmX8q
++AjZ59SkFX5zBnPeRWNz5/1Y20AduAx1fJ2045yimGdTHOqhDKMwxFSaEM3oOSoj
+7ETr6QxQuBQ2lUgROi2CoT/IdLn/FkfOucDSCZBSt8MFvVPfY72hGbGBlSdmnJZu
+R5XqMeJaTC4rVtqEFalqUvBQyFILl0C4K5zAlGsQyzgZmU8QAYHa4O0CAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+
+systemctl start tinc@ceph
+
+Пинги пошли. Идем дальше. 
+
+apt install ceph-deploy
+Требовалось прокинуть ключи на хосты
+Вывод такой
+ceph-deploy new ceph_remote ceph_local
+[ceph_deploy.conf][DEBUG ] found configuration file at: /root/.cephdeploy.conf
+[ceph_deploy.cli][INFO  ] Invoked (2.0.1): /usr/bin/ceph-deploy new ceph_remote ceph_local
+[ceph_deploy.cli][INFO  ] ceph-deploy options:
+[ceph_deploy.cli][INFO  ]  verbose                       : False
+[ceph_deploy.cli][INFO  ]  quiet                         : False
+[ceph_deploy.cli][INFO  ]  username                      : None
+[ceph_deploy.cli][INFO  ]  overwrite_conf                : False
+[ceph_deploy.cli][INFO  ]  ceph_conf                     : None
+[ceph_deploy.cli][INFO  ]  cluster                       : ceph
+[ceph_deploy.cli][INFO  ]  mon                           : ['ceph_remote', 'ceph_local']
+[ceph_deploy.cli][INFO  ]  ssh_copykey                   : True
+[ceph_deploy.cli][INFO  ]  fsid                          : None
+[ceph_deploy.cli][INFO  ]  cluster_network               : None
+[ceph_deploy.cli][INFO  ]  public_network                : None
+[ceph_deploy.cli][INFO  ]  cd_conf                       : <ceph_deploy.conf.cephdeploy.Conf object at 0x7fc29e79e250>
+[ceph_deploy.cli][INFO  ]  default_release               : False
+[ceph_deploy.cli][INFO  ]  func                          : <function new at 0x7fc29e79af70>
+[ceph_deploy.new][DEBUG ] Creating new cluster named ceph
+[ceph_deploy.new][INFO  ] making sure passwordless SSH succeeds
+[ceph_remote][DEBUG ] connected to host: ubuntu-server 
+[ceph_remote][INFO  ] Running command: ssh -CT -o BatchMode=yes ceph_remote
+[ceph_remote][DEBUG ] connected to host: ceph_remote 
+[ceph_remote][INFO  ] Running command: /bin/ip link show
+[ceph_remote][INFO  ] Running command: /bin/ip addr show
+[ceph_remote][DEBUG ] IP addresses found: ['10.129.0.45', '192.168.10.1']
+[ceph_deploy.new][DEBUG ] Resolving host ceph_remote
+[ceph_deploy.new][DEBUG ] Monitor ceph_remote at 192.168.10.1
+[ceph_deploy.new][INFO  ] making sure passwordless SSH succeeds
+[ceph_local][DEBUG ] connected to host: ubuntu-server 
+[ceph_local][INFO  ] Running command: ssh -CT -o BatchMode=yes ceph_local
+[ceph_local][DEBUG ] connected to host: ceph_local 
+[ceph_local][INFO  ] Running command: /bin/ip link show
+[ceph_local][INFO  ] Running command: /bin/ip addr show
+[ceph_local][DEBUG ] IP addresses found: ['10.0.3.1', '192.168.10.2', '192.168.150.41']
+[ceph_deploy.new][DEBUG ] Resolving host ceph_local
+[ceph_deploy.new][DEBUG ] Monitor ceph_local at 192.168.10.2
+[ceph_deploy.new][DEBUG ] Monitor initial members are ['ceph_remote', 'ceph_local']
+[ceph_deploy.new][DEBUG ] Monitor addrs are ['192.168.10.1', '192.168.10.2']
+[ceph_deploy.new][DEBUG ] Creating a random mon key...
+[ceph_deploy.new][DEBUG ] Writing monitor keyring to ceph.mon.keyring...
+[ceph_deploy.new][DEBUG ] Writing initial config to ceph.conf...
+
+ceph-deploy install ceph_remote ceph_local
+ceph-deploy mon create-initial
+
+Была проблема с хостнеймами.
+Поправил,
+теперь проблема с формированием мониторов.
+[ceph_deploy.mon][ERROR ] Some monitors have still not reached quorum:
+[ceph_deploy.mon][ERROR ] ubuntu-server
+[ceph_deploy.mon][ERROR ] epdijp56kgen003qh9np
+
+root@ubuntu-server:/etc/ceph# ceph mon getmap -o /tmp/monmap
+2022-11-30T05:42:41.574+0000 7f8ef8d26700 -1 auth: unable to find a keyring on /etc/ceph/ceph.client.admin.keyring,/etc/ceph/ceph.keyring,/etc/ceph/keyring,/etc/ceph/keyring.bin,: (2) No such file or directory
+2022-11-30T05:42:41.574+0000 7f8ef8d26700 -1 AuthRegistry(0x7f8ef4059270) no keyring found at /etc/ceph/ceph.client.admin.keyring,/etc/ceph/ceph.keyring,/etc/ceph/keyring,/etc/ceph/keyring.bin,, disabling cephx
+2022-11-30T05:42:41.590+0000 7f8ef8d26700 -1 auth: unable to find a keyring on /etc/ceph/ceph.client.admin.keyring,/etc/ceph/ceph.keyring,/etc/ceph/keyring,/etc/ceph/keyring.bin,: (2) No such file or directory
+2022-11-30T05:42:41.590+0000 7f8ef8d26700 -1 AuthRegistry(0x7f8ef405ae18) no keyring found at /etc/ceph/ceph.client.admin.keyring,/etc/ceph/ceph.keyring,/etc/ceph/keyring,/etc/ceph/keyring.bin,, disabling cephx
+[errno 2] RADOS object not found (error connecting to the cluster)
+
+rebooted servers
+[ceph_deploy.mon][INFO  ] mon.ubuntu-server monitor has reached quorum!
+[ceph_deploy.mon][INFO  ] all initial monitors are running and have formed quorum
+[ceph_deploy.mon][INFO  ] Running gatherkeys...
+[ceph_deploy.gatherkeys][INFO  ] Storing keys in temp directory /tmp/tmpr9ngwyjd
+[epdijp56kgen003qh9np][DEBUG ] connected to host: epdijp56kgen003qh9np 
+[epdijp56kgen003qh9np][INFO  ] Running command: /usr/bin/ceph --connect-timeout=25 --cluster=ceph --admin-daemon=/var/run/ceph/ceph-mon.epdijp56kgen003qh9np.asok mon_status
+[epdijp56kgen003qh9np][INFO  ] Running command: /usr/bin/ceph --connect-timeout=25 --cluster=ceph --name mon. --keyring=/var/lib/ceph/mon/ceph-epdijp56kgen003qh9np/keyring auth get client.admin
+[epdijp56kgen003qh9np][INFO  ] Running command: /usr/bin/ceph --connect-timeout=25 --cluster=ceph --name mon. --keyring=/var/lib/ceph/mon/ceph-epdijp56kgen003qh9np/keyring auth get client.bootstrap-mds
+[epdijp56kgen003qh9np][INFO  ] Running command: /usr/bin/ceph --connect-timeout=25 --cluster=ceph --name mon. --keyring=/var/lib/ceph/mon/ceph-epdijp56kgen003qh9np/keyring auth get client.bootstrap-mgr
+[epdijp56kgen003qh9np][INFO  ] Running command: /usr/bin/ceph --connect-timeout=25 --cluster=ceph --name mon. --keyring=/var/lib/ceph/mon/ceph-epdijp56kgen003qh9np/keyring auth get client.bootstrap-osd
+[epdijp56kgen003qh9np][INFO  ] Running command: /usr/bin/ceph --connect-timeout=25 --cluster=ceph --name mon. --keyring=/var/lib/ceph/mon/ceph-epdijp56kgen003qh9np/keyring auth get client.bootstrap-rgw
+[ceph_deploy.gatherkeys][INFO  ] Storing ceph.client.admin.keyring
+[ceph_deploy.gatherkeys][INFO  ] Storing ceph.bootstrap-mds.keyring
+[ceph_deploy.gatherkeys][INFO  ] Storing ceph.bootstrap-mgr.keyring
+[ceph_deploy.gatherkeys][INFO  ] Replacing 'ceph.mon.keyring' and backing up old key as 'ceph.mon.keyring-20221130055323'
+[ceph_deploy.gatherkeys][INFO  ] Storing ceph.bootstrap-osd.keyring
+[ceph_deploy.gatherkeys][INFO  ] Storing ceph.bootstrap-rgw.keyring
+[ceph_deploy.gatherkeys][INFO  ] Destroy temp directory /tmp/tmpr9ngwyjd
+
+
+Создаем диски OSD, тоже не давалась с первого раза. Синтаксис поменялся оказывается. 
+Так создалось.
+ceph-deploy osd create --data /dev/vdb1 epdijp56kgen003qh9np
+Host epdijp56kgen003qh9np is now ready for osd use.
+
+ceph-deploy osd create --data /dev/sdc ubuntu-server
+Host ubuntu-server is now ready for osd use.
+
+2. Выполните команды ceph health и ceph -s на удаленном сервере.
+Взял отсюда
+https://docs.ceph.com/en/pacific/man/8/ceph-deploy/
+
+Пришлось запушить ключи, так как без них статус не выводился. 
+ceph-deploy admin epdijp56kgen003qh9np
+
+ceph health
+HEALTH_WARN mons are allowing insecure global_id reclaim; no active mgr
+root@epdijp56kgen003qh9np:/dev# ceph -s
+  cluster:
+    id:     a2d107a5-49a7-4133-b171-887c35dd2199
+    health: HEALTH_WARN
+            mons are allowing insecure global_id reclaim
+            no active mgr
+ 
+  services:
+    mon: 2 daemons, quorum epdijp56kgen003qh9np,ubuntu-server (age 30m)
+    mgr: no daemons active
+    osd: 2 osds: 2 up (since 11m), 2 in (since 11m)
+ 
+  data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs:     
+ 
+root@epdijp56kgen003qh9np:/dev# 
+3. Добавьте в кластер еще по одному диску с локального и удаленного серверов.
+Диск на удаленный сервер
+yc compute disk create --zone ru-central1-b --size=5 ceph-disk2
+done (9s)
+id: epdfpof6udiaur57cf4h
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-11-30T06:25:11Z"
+name: ceph-disk2
+type_id: network-hdd
+zone_id: ru-central1-b
+size: "5368709120"
+block_size: "4096"
+status: READY
+disk_placement_policy: {}
+yc compute instance attach-disk --name efoshkin-lnxa-09-06 --disk-name ceph-disk2
+
+
+Доп диск на локальном сервере
+lsblk | grep sdb
+sdb                                                                                                     8:16   0    5G  0 disk 
+root@ubuntu-server:/etc/ceph# 
+
+ceph-deploy osd create --data /dev/vdc epdijp56kgen003qh9np
+Host epdijp56kgen003qh9np is now ready for osd use.
+
+ceph-deploy osd create --data /dev/sdb1 ubuntu-server
+Host ubuntu-server is now ready for osd use.
+
+4. Выполните команды ceph health и ceph -s на удаленном сервере.
+root@epdijp56kgen003qh9np:/dev# ceph health
+HEALTH_WARN mons are allowing insecure global_id reclaim; no active mgr
+root@epdijp56kgen003qh9np:/dev# ceph -s
+  cluster:
+    id:     a2d107a5-49a7-4133-b171-887c35dd2199
+    health: HEALTH_WARN
+            mons are allowing insecure global_id reclaim
+            no active mgr
+ 
+  services:
+    mon: 2 daemons, quorum epdijp56kgen003qh9np,ubuntu-server (age 39m)
+    mgr: no daemons active
+    osd: 4 osds: 4 up (since 64s), 4 in (since 64s)
+ 
+  data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs:     
+ 
+
+
+5. Выставите размер пулов из команды ceph osd pool stats, равный двум. Выведите результат ceph -s.
+Мне сложно было понять что нужно поправить или где перед созданием пула, но почитав документацию тут
+https://docs.ceph.com/en/latest/rados/operations/pools/
+Я решил добавить след строки в главный конфиг файл
+
+vi /etc/ceph/ceph.conf
+osd_pool_default_size = 2  # Как я понял это тот размер пула из задания равный двум
+osd_pool_default_min_size = 1 # тут уже от обратного, чтобы не сломалось все сразу. Честно не понятно зачем делать пул из двух дисков.                                                        #  Может быть это как будто один пул один цод? 
+osd_pool_default_pg_num = 200   # Это в документации рекомендуют по пропорции поставить 4 осд * 100 \ 2 пула = 200 placement groups
+osd_pool_default_pgp_num = 200
+
+root@ubuntu-server:/etc/ceph# ceph -s
+  cluster:
+    id:     a2d107a5-49a7-4133-b171-887c35dd2199
+    health: HEALTH_WARN
+            mons are allowing insecure global_id reclaim
+            no active mgr
+ 
+  services:
+    mon: 2 daemons, quorum epdijp56kgen003qh9np,ubuntu-server (age 69m)
+    mgr: no daemons active
+    osd: 4 osds: 4 up (since 30m), 4 in (since 30m)
+ 
+  data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs:     
+ 
+ceph osd pool set rebrainme size 2
+6. Создайте пул rebrainme.
+ceph osd pool create rebrainme replicated
+      pool 'rebrainme' created
+rbd pool init rebrainme
+
+
+root@ubuntu-server:/etc/ceph# ceph osd pool get rebrainme size
+size: 3
+root@ubuntu-server:/etc/ceph# ceph osd pool set rebrainme size 2
+set pool 1 size to 2
+root@ubuntu-server:/etc/ceph# ceph osd pool get rebrainme size
+size: 2
+
+7. Запишите файл ceph-rebrainme-4M размером 4MiB и файл ceph-rebrainme-44M размером 44MiB в пул rebrainme.
+ll -h | grep rebrainme
+-rw-r--r--  1 root root  44M Nov 30 07:19 ceph-rebrainme-44M
+-rw-r--r--  1 root root 4.0M Nov 30 07:19 ceph-rebrainme-4M
+
+root@ubuntu-server:~# rados -p rebrainme put ceph-rebrainme-4M ceph-rebrainme-4M 
+root@ubuntu-server:~# rados -p rebrainme put ceph-rebrainme-44M ceph-rebrainme-44M 
+
+8. Выведите результат команды rados df.
+ rados df
+POOL_NAME  USED  OBJECTS  CLONES  COPIES  MISSING_ON_PRIMARY  UNFOUND  DEGRADED  RD_OPS  RD  WR_OPS  WR  USED COMPR  UNDER COMPR
+
+total_objects    0
+total_used       0 B
+total_avail      0 B
+total_space      0 B
+
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 4
+01.12.2022 09:09
+Добрый день!
+
+п.8. rados df - команда должна была вывести список пулов и статистику по ним, нужно разобраться что пошло не так.
+Попробуйте:
+
+rados ls -p
+01.12.2022 12:02
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+01.12.2022 12:02
+1. Настройте Ceph кластер из двух OSD дисков, расположенных на локальном и удаленном серверах.
+address: 51.250.20.119
+
+ tincd -n ceph -K4096
+
+cat tinc.conf 
+Name = ceph_remote
+AddressFamily = ipv4
+Device = /dev/net/tun
+root@epdsjqeek9508su4i7rs:/etc/tinc/ceph# cat tinc-up
+ip link set $INTERFACE up
+ip addr add 192.168.7.1/24 dev $INTERFACE
+root@epdsjqeek9508su4i7rs:/etc/tinc/ceph# cat tinc-down
+ip addr del 192.168.7.1/24 dev $INTERFACE
+ip link set $INTERFACE down
+root@epdsjqeek9508su4i7rs:/etc/tinc/ceph# cat hosts/ceph_remote 
+Address = 51.250.20.119
+Subnet = 192.168.7.1
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAy+MXw1yvqXYMj1BfL2HuFuoZtxMIEqexlNFSfd4gBbzE4CeEdRjQ
+ljGXs0UyXkGDesvmZev3ded98Noq7509fIz9ChH/dijr27ebYqE8DzkOWILLgLpF
+RJGWYxv6OjsyMVYsBZrz8tU8E//cw9YYaL2IPqiCqrkBeQnpo7UrBY9xAh8253h0
+Oozm4GFmYNucllteaVrWpcv29Pd2UDldUt13KQIXyecYWlgkq5P65xp4GxnwhhXy
+Mv3CdzaES6bWIAwOjbtzNXX/5Uy2Q/jsFYmmpSewMBR71YkwJfG6+BQogw5w8BJe
++BQbOfdX9jM9PaDuqKFkbDZA7PXmYusguGFfV71RZo5cnr5aqNlqrooYi25dMdRZ
+4QT7ujeQNVpMsdz96z+wB/okK3FXpsT8xAAVK2EjkSf2DiC5cleHizPUYFsk8PUk
+pX989oQy6e1NM757ic64KguhM07y1C8Jua4fGZLtI2+oNtZg+gzfJOW3Eg0QsDhK
+06oTxLkfdI7Clf/iEC2L4iS+kzAj7ex7Bd8ZdG9T/XRofMxyiQ6qaji8WcQrMN1b
+lfzmvwI/DT8UDttIZ5Vy6i+Y4Sn/5Ct52A5vWEkFU4yg71e7/5gWb/FZ61jnC7/D
+mSgt2hRcqPmFBSm5OHS3CZJA3TM2K6LQEuNyq16+Cs4JEXVf7VO1/zUCAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+root@ubuntuserver:/etc/tinc/ceph# cat tinc.conf 
+Name = ceph_local
+ConnectTo = ceph_remote
+Device = /dev/net/tun
+AddressFamily = ipv4
+root@ubuntuserver:/etc/tinc/ceph# cat tinc-up
+ip link set $INTERFACE up
+ip addr add 192.168.7.2/24 dev $INTERFACE
+root@ubuntuserver:/etc/tinc/ceph# cat tinc-down
+ip addr del 192.168.7.2/24 dev $INTERFACE
+ip link set $INTERFACE down
+root@ubuntuserver:/etc/tinc/ceph# cat hotst/*
+cat: 'hotst/*': No such file or directory
+root@ubuntuserver:/etc/tinc/ceph# cat hosts/ceph_*
+Address = 213.24.134.111
+Subnet = 192.168.7.2 
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEA5SdHyrOG7ZBcx7CGv3NMmJ+0MGnRhGv78i3D327LUybAuCPa2L5K
+yAnkp83YtPNPbTIhoTNif+mWRn0KLo7NsvjVAIkjuP5pNTM0fyYbpc2d9B0BbZWt
+S5uZ6hbuTKQyeozitfEnfdJjZpfxfDU8rstuXcMK75C2B5JJB5oLNCCrBUHy9GTc
+FeODcm32/fSKsY3d7kfu9in409M8u6309Rul16kMg7eS6NEY2rBeKqHyMaVUr9z/
++s9VLDre0GqTnp5RWbrlPXfbPvuXs8sMoAL7j6UsTgQ+geHIYIuY0hbn12rLVhMc
+fvdrrKWmwsY1oPRZ4W39poAzKO44mQSiBkKrlN3jrynhjAYPj4YGDmnFlRPiDZ2d
++DIiF3BQKZ4WOvVM5OsrvX5m6GwkqnWfzrJiGEuLgddbkKF06flpFVQ6AJpjCWTL
+sve7VGXCdjaetgsKlGcUqCymvieyno/BHviu0t+gUSaLBV2QLMmO1se2Z/sF0tZh
+BxDdM4Dagt9ROxHHw4EBWXd/jwX/qMCnub2kq160Tk3gBsf6fBZf9K+FoYawgBEg
+wK6c2my6zi3YS2XaXW0Ahm5kwt1HAQjhgn1WPGjMj9AM79E8BmNck2u88svpZfMH
+/WtmhBD0JhZhjETWEq3LUvfRouxkh8MkziT+83L3kYuTxTY+ABAIQJcCAwEAAQ==
+-----END RSA PUBLIC KEY-----
+Address = 51.250.20.119
+Subnet = 192.168.7.1
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAy+MXw1yvqXYMj1BfL2HuFuoZtxMIEqexlNFSfd4gBbzE4CeEdRjQ
+ljGXs0UyXkGDesvmZev3ded98Noq7509fIz9ChH/dijr27ebYqE8DzkOWILLgLpF
+RJGWYxv6OjsyMVYsBZrz8tU8E//cw9YYaL2IPqiCqrkBeQnpo7UrBY9xAh8253h0
+Oozm4GFmYNucllteaVrWpcv29Pd2UDldUt13KQIXyecYWlgkq5P65xp4GxnwhhXy
+Mv3CdzaES6bWIAwOjbtzNXX/5Uy2Q/jsFYmmpSewMBR71YkwJfG6+BQogw5w8BJe
++BQbOfdX9jM9PaDuqKFkbDZA7PXmYusguGFfV71RZo5cnr5aqNlqrooYi25dMdRZ
+4QT7ujeQNVpMsdz96z+wB/okK3FXpsT8xAAVK2EjkSf2DiC5cleHizPUYFsk8PUk
+pX989oQy6e1NM757ic64KguhM07y1C8Jua4fGZLtI2+oNtZg+gzfJOW3Eg0QsDhK
+06oTxLkfdI7Clf/iEC2L4iS+kzAj7ex7Bd8ZdG9T/XRofMxyiQ6qaji8WcQrMN1b
+lfzmvwI/DT8UDttIZ5Vy6i+Y4Sn/5Ct52A5vWEkFU4yg71e7/5gWb/FZ61jnC7/D
+mSgt2hRcqPmFBSm5OHS3CZJA3TM2K6LQEuNyq16+Cs4JEXVf7VO1/zUCAwEAAQ==
+-----END RSA PUBLIC KEY-----
+
+
+
+Создаем дополнительный жесткий диск на удаленной машине 
+ yc compute disk create --zone ru-central1-b --size=20 ceph-disk
+done (8s)
+id: epd9n74uu90gigk42qi2
+folder_id: b1gu2vqv4hil3okf70bb
+created_at: "2022-11-30T03:48:07Z"
+name: ceph-disk
+type_id: network-hdd
+zone_id: ru-central1-b
+size: "21474836480"
+block_size: "4096"
+status: READY
+disk_placement_policy: {}
+
+Добавляем жесткий диск к удаленной виртуалке
+yc compute instance attach-disk --name efoshkin-lnxa-09-06 --disk-name ceph-disk
+
+Добавил жесткий диск на локальную виртуальную машину.
+в размере 20Гб. 
+
+systemctl start tinc@ceph
+
+Пинги пошли. Идем дальше. 
+
+
+apt install ceph-deploy
+
+На удаленном сервере ставим 
+apt install ceph-common
+
+Требовалось прокинуть ключи на хосты
+ssh-keygen -t rsa -b 4096
+
+Добавляем в хостс
+192.168.7.1 epdsjqeek9508su4i7rs
+192.168.7.2 ubuntuserver
+
+ceph-deploy new epdsjqeek9508su4i7rs ubuntuserver
+ceph-deploy install ubuntuserver
+ceph-deploy install epdsjqeek9508su4i7rs  ubuntuserver
+# [epdsjqeek9508su4i7rs][DEBUG ] ceph version 15.2.17 (8a82819d84cf884bd39c17e3236e0632ac146dc4) octopus (stable)
+ceph-deploy mon create-initial
+ceph-deploy admin epdsjqeek9508su4i7rs
+
+root@ubuntuserver:/etc/ceph# ceph -s
+  cluster:
+    id:     2a37d7a5-d4d9-4390-9464-7e65d52583db
+    health: HEALTH_WARN
+            mons are allowing insecure global_id reclaim
+ 
+  services:
+    mon: 2 daemons, quorum epdsjqeek9508su4i7rs,ubuntuserver (age 20s)
+    mgr: no daemons active
+    osd: 0 osds: 0 up, 0 in
+ 
+  data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs:     
+ 
+
+
+Удалить все
+ rm -rf /etc/ceph/*
+ rm -rf /var/lib/ceph/*/*
+ rm -rf /var/log/ceph/*
+ rm -rf /var/run/ceph/*
+ 
+ 
+Создаем диски OSD, тоже не давалась с первого раза. Синтаксис поменялся оказывается. 
+Так создалось.
+ceph-deploy osd create epdsjqeek9508su4i7rs --data /dev/vdb1
+ceph-deploy osd create ubuntuserver --data /dev/sdb1
+
+2. Выполните команды ceph health и ceph -s на удаленном сервере.
+Взял отсюда
+https://docs.ceph.com/en/pacific/man/8/ceph-deploy/
+
+Пришлось запушить ключи, так как без них статус не выводился. 
+ceph-deploy admin epdsjqeek9508su4i7rs
+root@epdsjqeek9508su4i7rs:/etc/ceph# ceph health
+HEALTH_WARN mons are allowing insecure global_id reclaim; no active mgr
+root@epdsjqeek9508su4i7rs:/etc/ceph# ceph -s
+  cluster:
+    id:     2a37d7a5-d4d9-4390-9464-7e65d52583db
+    health: HEALTH_WARN
+            mons are allowing insecure global_id reclaim
+            no active mgr
+ 
+  services:
+    mon: 2 daemons, quorum epdsjqeek9508su4i7rs,ubuntuserver (age 11m)
+    mgr: no daemons active
+    osd: 2 osds: 2 up (since 57s), 2 in (since 57s)
+ 
+  data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs:     
+ 
+
+3. Добавьте в кластер еще по одному диску с локального и удаленного серверов.
+Диск на удаленный сервер
+yc compute disk create --zone ru-central1-b --size=10 ceph-disk-second
+yc compute instance attach-disk --name efoshkin-lnxa-09-06 --disk-name ceph-disk-second
+Доп диск на локальном сервере
+lsblk | grep sdb
+sdc                                                                       8:32   0   10G  0 disk 
+
+ceph-deploy osd create epdsjqeek9508su4i7rs --data /dev/vdc1
+ceph-deploy osd create ubuntuserver --data /dev/sdc1
+
+4. Выполните команды ceph health и ceph -s на удаленном сервере.
+root@epdsjqeek9508su4i7rs:/etc/ceph# ceph health
+HEALTH_WARN mons are allowing insecure global_id reclaim; no active mgr
+root@epdsjqeek9508su4i7rs:/etc/ceph# ceph -s
+  cluster:
+    id:     2a37d7a5-d4d9-4390-9464-7e65d52583db
+    health: HEALTH_WARN
+            mons are allowing insecure global_id reclaim
+            no active mgr
+ 
+  services:
+    mon: 2 daemons, quorum epdsjqeek9508su4i7rs,ubuntuserver (age 6m)
+    mgr: no daemons active
+    osd: 4 osds: 4 up (since 36s), 4 in (since 36s)
+ 
+  data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs:     
+5. Выставите размер пулов из команды ceph osd pool stats, равный двум. Выведите результат ceph -s.
+Мне сложно было понять что нужно поправить или где перед созданием пула, но почитав документацию тут
+https://docs.ceph.com/en/latest/rados/operations/pools/
+Я решил добавить след строки в главный конфиг файл
+
+vi /etc/ceph/ceph.conf
+osd_pool_default_size = 2 
+osd_pool_default_min_size = 1
+osd_pool_default_pg_num = 200 
+osd_pool_default_pgp_num = 200
+
+
+root@ubuntuserver:/etc/ceph# ceph -s
+  cluster:
+    id:     2a37d7a5-d4d9-4390-9464-7e65d52583db
+    health: HEALTH_WARN
+            mons are allowing insecure global_id reclaim
+            no active mgr
+ 
+  services:
+    mon: 2 daemons, quorum epdsjqeek9508su4i7rs,ubuntuserver (age 13m)
+    mgr: no daemons active
+    osd: 4 osds: 4 up (since 7m), 4 in (since 7m)
+ 
+  data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs:     
+
+ 
+ceph osd pool set rebrainme size 2
+6. Создайте пул rebrainme.
+ceph osd pool create rebrainme 
+ceph osd lspools
+1 rebrainme
+
+
+Я не понял как заранее установить размер пула, добавив в конфиг он не работает.
+Пришлось руками
+
+root@ubuntuserver:/etc/ceph# ceph osd pool get rebrainme size
+size: 3
+root@ubuntuserver:/etc/ceph# ceph osd pool set rebrainme size 2
+set pool 1 size to 2
+root@ubuntuserver:/etc/ceph# ceph osd pool get rebrainme size
+size: 2
+
+
+ceph osd pool application enable rebrainme cephfs --yes-i-really-mean-it
+root@ubuntuserver:/etc/ceph# ceph fs new cephfs rebrainme rebrainme
+new fs with metadata pool 1 and data pool 1
+ceph osd pool create rebrainme_metadata
+pool 'rebrainme_metadata' created
+
+root@ubuntuserver:/etc/ceph# ceph fs ls
+name: cephfs, metadata pool: rebrainme, data pools: [rebrainme ]
+
+mount -t ceph 192.168.7.1:6789:/ /mnt/mycephfs -o name=admin,secret=AQCPSYhjt+jUMRAAyhsMCueIXSzcGyjjGIEG5Q==
+mount error: no mds server is up or the cluster is laggy
+
+
+
+7. Запишите файл ceph-rebrainme-4M размером 4MiB и файл ceph-rebrainme-44M размером 44MiB в пул rebrainme.
+ll -h | grep rebrainme
+-rw-r--r--  1 root root  44M Nov 30 07:19 ceph-rebrainme-44M
+-rw-r--r--  1 root root 4.0M Nov 30 07:19 ceph-rebrainme-4M
+
+root@ubuntu-server:~# rados -p rebrainme put ceph-rebrainme-4M ceph-rebrainme-4M 
+root@ubuntu-server:~# rados -p rebrainme put ceph-rebrainme-44M ceph-rebrainme-44M 
+
+8. Выведите результат команды rados df.
+ rados df
+POOL_NAME  USED  OBJECTS  CLONES  COPIES  MISSING_ON_PRIMARY  UNFOUND  DEGRADED  RD_OPS  RD  WR_OPS  WR  USED COMPR  UNDER COMPR
+
+total_objects    0
+total_used       0 B
+total_avail      0 B
+total_space      0 B
+
+
+
+root@epdsjqeek9508su4i7rs:/etc/ceph# ceph -s
+  cluster:
+    id:     2a37d7a5-d4d9-4390-9464-7e65d52583db
+    health: HEALTH_ERR
+            mons are allowing insecure global_id reclaim
+            2 filesystems are offline
+            2 filesystems are online with fewer MDS than max_mds
+            no active mgr
+ 
+  services:
+    mon: 2 daemons, quorum epdsjqeek9508su4i7rs,ubuntuserver (age 74m)
+    mgr: no daemons active
+    mds: cephfs:0 cephfs2:0
+    osd: 4 osds: 4 up (since 68m), 4 in (since 68m)
+ 
+  data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs:     
+ 
+
+
+Блин я пересоздал все с нуля. И не получается. Мне кажется я не понимаю разницу. Вот вроде создал пул, есть осд, Дальше там несколько вариантов файловой системы или cephfs, или rdb. Как работает радос я тоже не понимаю, к сожалению. Выходит пулы есть но они не смонтированные...
+файлы кладутся кудато. Я как понял чтобы с цефом разобраться нужно курс отдельный по нему проходить...
+
+
+root@ubuntuserver:/etc/ceph# rados ls -p rebrainme
+ceph-rebrainme-44M
+ceph-rebrainme-4M
+root@ubuntuserver:/
+
+
+
+root@ubuntuserver:/etc/ceph# ceph osd utilization
+avg 40
+stddev 9 (expected baseline 5.47723)
+min osd.2 with 27 pgs (0.675 * mean)
+max osd.0 with 37 pgs (0.925 * mean)
+root@ubuntuserver:/etc/ceph# ceph osd stat
+4 osds: 4 up (since 2h), 4 in (since 2h); epoch: e39
+root@ubuntuserver:/etc/ceph# ceph pool stats
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+02.12.2022 11:56
+Добрый день!
+
+В принципе все работает, проверил практически, файлы в пул загружаются, из пула выгружаются, но статистику пула получить невозможно.
+
+Предположительно проблема с ключами.
+
+Давайте закроем вопрос здесь, но если интерес сохранится, то вернемся к нему в чате, подниму систему на Octopus, сравним результатю
+
+
+
+*****************************************************************************
+Теория
+*****************************************************************************
+
+
+LNXA-09 06: Storage. Ceph
+Описание:
+Ceph - это open source решение для построения распределенного хранилища объектов или распределенной файловой системы. Ceph позволяет спроектировать кластер, который имеет следующие параметры:
+
+масштабируемость
+надежность
+производительность
+Иногда эти параметры могут конкурировать, но Ceph позволяет спроектировать систему под конкретную нагрузку и конкретные задачи.
+
+Ключевыми компонентами кластера являются мониторы (MON) и дисковые ноды (OSD).
+
+Мониторы — это демоны, которые принимают решение в кластере. Именно они хранят актуальную версию карты кластера (cluster map). Для принятия решения мониторы используют некую модификацию протокола Paxos, в котором прийти и спросить cluster map можно к любому монитору, а не только к лидеру. Право на обновление cluster map имеет только лидер, которого мониторы выбирают абсолютным большинством голосов, поэтому мониторов должно быть нечетное количество. Остальным лидер выдает время (lease), в течение которого они могут отдавать актуальную cluster map. Если какой-то из мониторов не получил lease, он вызывает голосование. Номер эпохи увеличивается на 1, и мониторы абсолютным большинством голосов выбирают нового лидера. Когда монитору приходит запрос на обновление cluster map (например, какая-то OSD упала), он сначала проверяет, насколько ново это сообщение. Если она уже помечена как down, то монитор просто отправит обновление cluster map той OSD, которая прислала информацию о падении. Если это новое сообщение, то оно передаётся лидеру, который их агрегирует, обновляет cluster map и отдает новый cluster map остальным мониторам, продлевая им lease.
+
+OSD (Object Storage Device) — основные участники кластера. OSD демоны запущены на хостах, на которых находятся диски, по одному демону на диск.
+
+MDS (Meta Data Servers) нужен для управления пространством имен файловой системы. Кластер MDS старается отвечать на запросы из кеша в памяти, но все операции обновления/записи сразу пишутся на диски OSD. Если активный MDS падает, то включается тот, что был в режиме standby. Происходит это очень быстро, потому что сами метаданные лежат на дисках OSD. В момент старта он подсасывает бинарный журнал упавшего MDS в память, чтобы наполнить кеш. Есть возможность любой из standby-MDS завести в режиме standby-relay, тогда он будет в режиме, близком к реальному времени, подсасывать данные из кеша активного MDS.
+
+Когда файл разбивается на объекты, то из inode получаются идентификаторы объектов oid. Затем от oid берется простейший хеш и получается pgid — идентификатор placement group (PG). Затем PG назначается конкретным OSD с использованием алгоритма CRUSH. Таким образом, каждый объект закреплен за PG. PG закреплена за списком OSD. На одном OSD расположено много (рекомендуют 100) PG. Соответственно, для того чтобы найти объект, нужно вычислить его PG и посмотреть в cluster map, за какими OSD закреплена эта PG. Каждый раз, когда cluster map изменяется, меняется номер эпохи cluster map и обновления распространяются на OSD инкрементно (отправляется только разница между актуальной версией и последней, которая есть на OSD).
+
+Репликация происходит следующим образом. Данные реплицируются по PG. PG закреплена за упорядоченным списком из n OSD (где n — фактор репликации). Клиент посылает все запросы на запись в первую активную OSD (primary), которая назначает новую версию объекту и сама производит копирование на все остальные реплики. После того как все реплики записали данные в кеш-буфер и сказали об этом primary, primary OSD отправляет клиенту ack. В этот момент клиент считает, что все получилось, но хранит все операции записи в буфере до тех пор, пока не придет commit. Commit будет отправлен, когда все ноды PG запишут данные на диск. Провалы в записи на реплики игнорируются, потому что «последующее восстановление надежно вернет консистентность». При любой операции записи изменяется номер версии этой PG. Чтение производится с primary OSD этой PG. Это сделано для того, чтобы обеспечить целостность данных во время восстановления, например.
+
+Каждая OSD посылает heartbeat сообщения тем OSD, которые отвечают за эту же PG. Если между ними идет обмен данными, то такие сообщения не посылаются. Ceph различает два типа падения:
+
+OSD (пусть primary) помечается как down, когда она не отвечает на heartbeat, и все обязанности primary OSD временно ложатся на следующую OSD, отвечающую за эту PG. Клиенты с активными подключениями повторно отправят запросы на новую primary OSD.
+Если упавшая OSD не смогла подняться быстро (по умолчанию 300 с), она помечается как down и исключается из распределения данных: другая OSD включается в эту PG, и на нее начинают реплицироваться данные этой PG. Решение о каждом из типов падения принимают мониторы.
+При падении/восстановлении/добавлении OSD изменяется cluster map. Чтобы быстро осуществлять восстановление, OSD поддерживают версию каждого объекта и лог последних изменений для каждой PG. Когда активная OSD получает (от монитора) обновление cluster map, она сверяет то, что у нее есть, с тем, за что она ответственна согласно cluster map. Если ответственность за какие-то PG изменилась или OSD только загрузилась, она должна начать процедуру peering'а с остальными OSD, ответственными за эту PG. Если OSD является primary для этой PG, она собирает со всех реплик версию PG, находит самую актуальную, подсасывает инкрементно все необходимые изменения (в виде журнала изменений) и раздает на остальные реплики. Только после того, как primary OSD определила самую актуальную версию PG и раздала ее (журнал изменений, а не сами данные) всем репликам, начинают обрабатываться запросы к этой PG. Если к OSD приходит запрос на чтение/изменение устаревшего или отсутствующего объекта, она приостановит обработку запроса и переставит этот объект в начало очереди восстановления. Например, osd1 падает и помечается как down, osd2 становится primary для pg1. Если osd1 поднимется, она при старте спросит у монитора актуальную cluster map, и монитор пометит ее как up. Когда osd2 получит обновление cluster map и поймет, что она больше не primary для pg1, она отправит osd1 версию pg1. osd1 получит с osd2 лог изменений, скажет osd2, что ее данные актуальны, и начнет обрабатывать запросы клиентов, выполняя восстановление в фоне. Эта схема хороша тем, что когда OSD, ответственная за 100 PG, падает, а затем поднимается, она подсасывает изменения не с одной машины, а параллельно со множества со всех OSD, с которыми она ответственна за какие-то PG.
+
+Ниже приведен пример создания Ceph кластера из трех дисков, расположенных на разных хостах. Управления кластером будет происходить с помощью утилиты ceph-deploy, запускаемой на отдельном сервере.
+
+Создание кластера. После выполнения команды в текущей директории должен появиться конфигурационный файл ceph.conf:
+
+# ceph-deploy new server1 server2 server0
+...
+[ceph_deploy.new][DEBUG ] Writing initial config to ceph.conf...
+[ceph_deploy.new][DEBUG ] Writing monitor keyring to ceph.mon.keyring...
+Установка пакетов Ceph на ноды кластера, первоначальная настройка монитора и сбор ключей:
+
+# ceph-deploy install server0 server1 server2
+# ceph-deploy mon create-initial
+...
+[ceph_deploy.gatherkeys][DEBUG ] Checking server1 for /etc/ceph/ceph.client.admin.keyring
+[server1][DEBUG ] connected to host: server1
+[server1][DEBUG ] detect platform information from remote host
+[server1][DEBUG ] detect machine type
+[server1][DEBUG ] fetch remote file
+[ceph_deploy.gatherkeys][DEBUG ] Checking server2 for /etc/ceph/ceph.client.admin.keyring
+[server2][DEBUG ] connected to host: server2
+[server2][DEBUG ] detect platform information from remote host
+[server2][DEBUG ] detect machine type
+[server2][DEBUG ] fetch remote file
+[ceph_deploy.gatherkeys][DEBUG ] Got ceph.client.admin.keyring key from server2.
+[ceph_deploy.gatherkeys][DEBUG ] Have ceph.mon.keyring
+[ceph_deploy.gatherkeys][DEBUG ] Checking server1 for /var/lib/ceph/bootstrap-osd/ceph.keyring
+[server1][DEBUG ] connected to host: server1
+[server1][DEBUG ] detect platform information from remote host
+[server1][DEBUG ] detect machine type
+[server1][DEBUG ] fetch remote file
+[ceph_deploy.gatherkeys][DEBUG ] Got ceph.bootstrap-osd.keyring key from server1.
+[ceph_deploy.gatherkeys][DEBUG ] Checking server1 for /var/lib/ceph/bootstrap-mds/ceph.keyring
+[server1][DEBUG ] connected to host: server1
+[server1][DEBUG ] detect platform information from remote host
+[server1][DEBUG ] detect machine type
+[server1][DEBUG ] fetch remote file
+[ceph_deploy.gatherkeys][DEBUG ] Got ceph.bootstrap-mds.keyring key from server1.
+Добавление OSD на каждой ноде кластера с использованием свободного диска. А также проверка состояния кластера:
+
+# ceph-deploy osd create  server0:/dev/sdbk
+...
+[server0][INFO  ] Running command: ceph-disk-prepare --fs-type xfs --cluster ceph -- /dev/sdbk
+[server0][DEBUG ] Creating new GPT entries.
+[server0][DEBUG ] The operation has completed successfully.
+...
+# ceph-deploy osd create  server1:/dev/sdbk
+# ceph-deploy osd create  server2:/dev/sdbk
+server0~:# ceph -s
+    cluster 7b95a55e-4f3e-4937-b058-b777b6360596
+     health HEALTH_OK
+     monmap e1: 3 mons at {server0=[2a02:6b8:c03:794:0:41af:f292:91c7]:6789/0,server1=[2a02:6b8:c03:794:0:41af:570f:9233]:6789/0,server2=[2a02:6b8:c03:72f:0:41af:c6e9:c73f]:6789/0}, election epoch 4, quorum 0,1,2 server2,server1,server0
+     osdmap e15: 3 osds: 3 up, 3 in
+      pgmap v41: 196 pgs, 4 pools, 12 bytes data, 1 objects
+            118 MB used, 39095 GB / 39096 GB avail
+                 196 active+clean
+Запишем файл rebrainme и посмотрим, в какую placement group (PG) он попадет:
+
+# rados put rebrainme-object-1 rebrainme --pool=data
+# rados -p data ls
+rebrainme-object-1
+# # ceph osd map data rebrainme-object-1
+osdmap e15 pool 'data' (0) object 'rebrainme-object-1' -> pg 0.5c839aa6 (0.26) -> up ([0,1,2], p0) acting ([0,1,2], p0)
+Тестовый файл попал в PG 0.26.
+
+Сегодня мы рассмотрели, как работает Ceph. Он позволяет достаточно легко настроить распределенную файловую систему. Также Ceph достаточно гикбий и хорошо масштабируется. Больше информации можно найти в документации
+
+Полезные ссылки:
+ceph.io
+Ceph: Распределенная файловая система петабайтных масштабов для Linux
+Знакомство с хранилищем Ceph в картинках
+Полное руководство Ceph, 2е изд.
