@@ -1,0 +1,273 @@
+Задание:
+Сделайте добавление по умолчанию в любом контейнере параметра sysctl net.ipv4.conf.all.forwarding=1 (команды и вывод сохраните).
+Запустите контейнер со следующими требованиями (команды и вывод сохраните):
+дистрибутив - последний доступный Ubuntu LTS;
+1 GiB RAM;
+1 CPU;
+отдельный диск на 5 GiB;
+имя - rebrainme_lxc.
+Установите в нем nginx, который будет отдавать строку Hello from LXC (команды и вывод сохраните).
+Выведите список контейнеров с флагом -f и при помощи curl сделайте запрос с хоста к nginx, находящемуся в контейнере (команды и вывод сохраните).
+При помощи nginx на хосте настройте проксирование запросов на порт 8090 в nginx, который находится в контейнере.
+На проверку отправьте все сохраненные команды и выводы, адрес вашего сервера и конфигурационный файл с server для проксирования в контейнер.
+
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+13.11.2022 00:33
+1. Установка
+address: 130.193.55.161
+
+apt update
+sudo apt-get install lxc debootstrap bridge-utils lxc-templates cgroup-tools
+
+root@epdp64kdjh3j0aoo5rau:/home/yc-user#  lxc-checkconfig
+LXC version 4.0.12
+Kernel configuration not found at /proc/config.gz; searching...
+Kernel configuration found at /boot/config-5.4.0-124-generic
+--- Namespaces ---
+Namespaces: enabled
+Utsname namespace: enabled
+Ipc namespace: enabled
+Pid namespace: enabled
+User namespace: enabled
+Network namespace: enabled
+
+--- Control groups ---
+Cgroups: enabled
+Cgroup namespace: enabled
+
+Cgroup v1 mount points: 
+/sys/fs/cgroup/systemd
+/sys/fs/cgroup/devices
+/sys/fs/cgroup/hugetlb
+/sys/fs/cgroup/pids
+/sys/fs/cgroup/net_cls,net_prio
+/sys/fs/cgroup/rdma
+/sys/fs/cgroup/cpu,cpuacct
+/sys/fs/cgroup/perf_event
+/sys/fs/cgroup/cpuset
+/sys/fs/cgroup/blkio
+/sys/fs/cgroup/memory
+/sys/fs/cgroup/freezer
+
+Cgroup v2 mount points: 
+/sys/fs/cgroup/unified
+
+Cgroup v1 clone_children flag: enabled
+Cgroup device: enabled
+Cgroup sched: enabled
+Cgroup cpu account: enabled
+Cgroup memory controller: enabled
+Cgroup cpuset: enabled
+
+--- Misc ---
+Veth pair device: enabled, not loaded
+Macvlan: enabled, not loaded
+Vlan: enabled, not loaded
+Bridges: enabled, loaded
+Advanced netfilter: enabled, not loaded
+CONFIG_IP_NF_TARGET_MASQUERADE: enabled, not loaded
+CONFIG_IP6_NF_TARGET_MASQUERADE: enabled, not loaded
+CONFIG_NETFILTER_XT_TARGET_CHECKSUM: enabled, loaded
+CONFIG_NETFILTER_XT_MATCH_COMMENT: enabled, not loaded
+FUSE (for use with lxcfs): enabled, not loaded
+
+--- Checkpoint/Restore ---
+checkpoint restore: enabled
+CONFIG_FHANDLE: enabled
+CONFIG_EVENTFD: enabled
+CONFIG_EPOLL: enabled
+CONFIG_UNIX_DIAG: enabled
+CONFIG_INET_DIAG: enabled
+CONFIG_PACKET_DIAG: enabled
+CONFIG_NETLINK_DIAG: enabled
+File capabilities: 
+
+Note : Before booting a new kernel, you can check its configuration
+usage : CONFIG=/path/to/config /usr/bin/lxc-checkconfig
+
+# Смонтированные точки
+root@epdp64kdjh3j0aoo5rau:/home/yc-user# mount
+sysfs on /sys type sysfs (rw,nosuid,nodev,noexec,relatime)
+proc on /proc type proc (rw,nosuid,nodev,noexec,relatime)
+udev on /dev type devtmpfs (rw,nosuid,noexec,relatime,size=985712k,nr_inodes=246428,mode=755)
+devpts on /dev/pts type devpts (rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000)
+tmpfs on /run type tmpfs (rw,nosuid,nodev,noexec,relatime,size=203068k,mode=755)
+/dev/vda2 on / type ext4 (rw,relatime,errors=remount-ro)
+securityfs on /sys/kernel/security type securityfs (rw,nosuid,nodev,noexec,relatime)
+tmpfs on /dev/shm type tmpfs (rw,nosuid,nodev)
+tmpfs on /run/lock type tmpfs (rw,nosuid,nodev,noexec,relatime,size=5120k)
+tmpfs on /sys/fs/cgroup type tmpfs (ro,nosuid,nodev,noexec,mode=755)
+cgroup2 on /sys/fs/cgroup/unified type cgroup2 (rw,nosuid,nodev,noexec,relatime)
+cgroup on /sys/fs/cgroup/systemd type cgroup (rw,nosuid,nodev,noexec,relatime,xattr,name=systemd)
+pstore on /sys/fs/pstore type pstore (rw,nosuid,nodev,noexec,relatime)
+none on /sys/fs/bpf type bpf (rw,nosuid,nodev,noexec,relatime,mode=700)
+cgroup on /sys/fs/cgroup/devices type cgroup (rw,nosuid,nodev,noexec,relatime,devices)
+cgroup on /sys/fs/cgroup/hugetlb type cgroup (rw,nosuid,nodev,noexec,relatime,hugetlb)
+cgroup on /sys/fs/cgroup/pids type cgroup (rw,nosuid,nodev,noexec,relatime,pids)
+cgroup on /sys/fs/cgroup/net_cls,net_prio type cgroup (rw,nosuid,nodev,noexec,relatime,net_cls,net_prio)
+cgroup on /sys/fs/cgroup/rdma type cgroup (rw,nosuid,nodev,noexec,relatime,rdma)
+cgroup on /sys/fs/cgroup/cpu,cpuacct type cgroup (rw,nosuid,nodev,noexec,relatime,cpu,cpuacct)
+cgroup on /sys/fs/cgroup/perf_event type cgroup (rw,nosuid,nodev,noexec,relatime,perf_event)
+cgroup on /sys/fs/cgroup/cpuset type cgroup (rw,nosuid,nodev,noexec,relatime,cpuset,clone_children)
+cgroup on /sys/fs/cgroup/blkio type cgroup (rw,nosuid,nodev,noexec,relatime,blkio)
+cgroup on /sys/fs/cgroup/memory type cgroup (rw,nosuid,nodev,noexec,relatime,memory)
+cgroup on /sys/fs/cgroup/freezer type cgroup (rw,nosuid,nodev,noexec,relatime,freezer)
+systemd-1 on /proc/sys/fs/binfmt_misc type autofs (rw,relatime,fd=28,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=13963)
+hugetlbfs on /dev/hugepages type hugetlbfs (rw,relatime,pagesize=2M)
+mqueue on /dev/mqueue type mqueue (rw,nosuid,nodev,noexec,relatime)
+tracefs on /sys/kernel/tracing type tracefs (rw,nosuid,nodev,noexec,relatime)
+debugfs on /sys/kernel/debug type debugfs (rw,nosuid,nodev,noexec,relatime)
+fusectl on /sys/fs/fuse/connections type fusectl (rw,nosuid,nodev,noexec,relatime)
+configfs on /sys/kernel/config type configfs (rw,nosuid,nodev,noexec,relatime)
+tmpfs on /run/user/1000 type tmpfs (rw,nosuid,nodev,relatime,size=203064k,mode=700,uid=1000,gid=1001)
+lxcfs on /var/lib/lxcfs type fuse.lxcfs (rw,nosuid,nodev,relatime,user_id=0,group_id=0,allow_other)
+root@epdp64kdjh3j0aoo5rau:/home/yc-user# 
+
+2. Сделайте добавление по умолчанию в любом контейнере параметра sysctl net.ipv4.conf.all.forwarding=1 (команды и вывод сохраните).
+root@epdp64kdjh3j0aoo5rau:/home/yc-user# cat /etc/lxc/default.conf 
+lxc.net.0.type = veth
+lxc.net.0.link = lxcbr0
+lxc.net.0.flags = up
+lxc.net.0.hwaddr = 00:16:3e:xx:xx:xx
+net.ipv4.conf.all.forwarding=1
+
+3. Запустите контейнер со следующими требованиями (команды и вывод сохраните):
+дистрибутив - последний доступный Ubuntu LTS; 1 GiB RAM; 1 CPU; отдельный диск на 5 GiB; имя - rebrainme_lxc.
+
+
+
+
+fdisk /dv/sdb
+mkfs.xfs /dev/sdb1
+vi /etc/fstab
+/dev/sdb1   /var/lib/lxc/rebrainme_lxc xfs defaults 0 0
+mkdir /var/lib/lxc/rebrainme_lxc
+mount -a
+
+lxc-create -t download -n rebrainme_lxc -- --dist ubuntu --release jammy --arch amd64
+lxc-ls -f
+NAME          STATE   AUTOSTART GROUPS IPV4 IPV6 UNPRIVILEGED 
+rebrainme_lxc STOPPED 0         -      -    -    false 
+
+
+df -h | grep rebrainme
+/dev/sdb1                          5.0G   68M  5.0G   2% /var/lib/lxc/rebrainme_lxc
+
+vi /var/lib/lxc/rebrainme_lxc/config 
+lxc.cgroup.cpuset.cpus = 0
+lxc.cgroup.memory.limit_in_bytes = 1G
+
+root@ubuntu-server:/var/lib/lxc/rebrainme_lxc# cat /var/lib/lxc/rebrainme_lxc/config 
+# Template used to create this container: /usr/share/lxc/templates/lxc-download
+# Parameters passed to the template: --dist ubuntu --release jammy --arch amd64
+# For additional config options, please look at lxc.container.conf(5)
+
+# Uncomment the following line to support nesting containers:
+#lxc.include = /usr/share/lxc/config/nesting.conf
+# (Be aware this has security implications)
+
+net.ipv4.conf.all.forwarding=1
+
+# Distribution configuration
+lxc.include = /usr/share/lxc/config/common.conf
+lxc.arch = linux64
+
+# Container specific configuration
+lxc.rootfs.path = dir:/var/lib/lxc/rebrainme_lxc/rootfs
+lxc.uts.name = rebrainme_lxc
+
+# Network configuration
+lxc.net.0.type = veth
+lxc.net.0.link = lxcbr0
+lxc.net.0.flags = up
+lxc.net.0.hwaddr = 00:16:3e:20:83:a6
+lxc.cgroup.cpuset.cpus = 0
+lxc.cgroup.memory.limit_in_bytes = 1G
+
+4. Установите в нем nginx, который будет отдавать строку Hello from LXC (команды и вывод сохраните).
+lxc-start -n rebrainme_lxc
+lxc-attach -n rebrainme_lxc
+apt install nginx
+
+rm /var/www/html/index.nginx-debian.html
+vi /var/www/html/hello
+Hello from LXC
+vi /etc/nginx/sites-enabled/default
+index hello;
+systemctl enable --now nginx
+
+root@rebrainmelxc:/var/www# curl localhost
+Hello from LXC
+
+
+5. Выведите список контейнеров с флагом -f и при помощи curl сделайте запрос с хоста к nginx, находящемуся в контейнере (команды и вывод сохраните).
+root@ubuntu-server:/var/lib/lxc/rebrainme_lxc# lxc-ls -f
+NAME          STATE   AUTOSTART GROUPS IPV4       IPV6 UNPRIVILEGED 
+rebrainme_lxc RUNNING 0         -      10.0.3.111 -    false        
+
+root@ubuntu-server:/var/lib/lxc/rebrainme_lxc# curl 10.0.3.111
+Hello from LXC
+
+
+6. При помощи nginx на хосте настройте проксирование запросов на порт 8090 в nginx, который находится в контейнере.
+apt install nginx
+ vi /etc/nginx/sites-enabled/default 
+ location / {
+ proxy_pass http://10.0.3.111;
+ }
+ 
+root@ubuntu-server:/var/lib/lxc/rebrainme_lxc# curl localhost
+Hello from LXC
+
+
+7. На проверку отправьте все сохраненные команды и выводы, адрес вашего сервера и конфигурационный файл с server для проксирования в контейнер.
+В общем, сначала я поднял виртуалку в облаке, потом не смог добавить доп жесткий диск в облаке. Решил создать локально виртуалку.
+Все делалось на виртуалке локальной. 
+Локально все. 
+В облаке сделаю прокси пасс тогда.
+
+root@ubuntu-server:/var/lib/lxc/rebrainme_lxc# cat /etc/nginx/sites-enabled/default | grep -v -E '^#|^$|^\s*#'
+server {
+	listen 80 default_server;
+	listen [::]:80 default_server;
+	root /var/www/html;
+	index index.html index.htm index.nginx-debian.html;
+	server_name _;
+	location / {
+		proxy_pass http://10.0.3.111;
+		try_files $uri $uri/ =404;
+	}
+}
+
+
+Для проверки сделал и в облачно
+curl http://130.193.55.161
+
+
+[m.efoshkin@fedora ~]$ curl 130.193.55.161
+Hello from LXC
+
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+14.11.2022 10:19
+Добрый день!
+
+"В общем, сначала я поднял виртуалку в облаке, потом не смог добавить доп жесткий диск в облаке. Решил создать локально виртуалку" - в принципе такая возможность в YC есть, но здесь можно было создать диск на основе файла:
+
+# truncate -s 5G /var/lib/lxc/rebrainme_lxc.img
+# mkfs.ext4 -F /var/lib/lxc/rebrainme_lxc.img
+# mkdir /var/lib/lxc/rebrainme_lxc
+# mount -t ext4 -o loop /var/lib/lxc/rebrainme_lxc.img /var/lib/lxc/rebrainme_lxc
+# echo "/var/lib/lxc/rebrainme_lxc.img /var/lib/lxc/rebrainme_lxc ext4 loop 0 0" >> /etc/fstab
+Если интересно, почитайте про loop-устройства. Иногда у нас бывает образ диска в файле и его нужно смонтировать.
+
+Отличные знание темы и выполнение задания, хорошо что применяете бизнес-подход, т.е. сперва решение задачи/проблемы, потом уже детальное разбирательство (технический долг), замечаний и вопросов нет!
