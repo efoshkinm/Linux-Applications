@@ -1,0 +1,119 @@
+Задание:
+Настройте вашу систему так, чтобы все логи из journald отправлялись демону syslog (в зависимости от того, что по умолчанию поставляет дистрибутив).
+Выведите последние 10 строк из файла /var/log/auth.log (команду и вывод сохраните).
+На проверку отправьте сохраненные выводы команд и конфигурационный файл journald (с его путем в системе) с комментариями, что было изменено (или не изменено) и по какой причине.
+
+****************************************************************************
+Решение
+****************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+31.08.2022 09:49
+После прочтения материала, я установил у себя два пункта в journald.conf:
+
+[root@MiWiFi-R4A-srv systemd]# cat /etc/systemd/journald.conf | grep -v '#'
+
+[Journal]
+Storage=persistent
+ForwardToSyslog=yes
+[root@MiWiFi-R4A-srv systemd]# 
+
+
+Так же я в настройке системы в systemd сделал следующие изменения чтобы включить больше логов.
+[root@MiWiFi-R4A-srv systemd]# cat /etc/systemd/system.conf | grep -v '#'
+
+[Manager]
+LogLevel=info
+LogTarget=journal-or-kmsg
+LogColor=yes
+LogLocation=yes
+LogTime=yes
+DumpCore=yes
+ShowStatus=yes
+CrashShell=yes
+[root@MiWiFi-R4A-srv systemd]# 
+
+2. Выведите последние 10 строк из файла /var/log/auth.log (команду и вывод сохраните).
+На моей машине не было этого файла. У меня федора. Был аудит.
+
+[root@MiWiFi-R4A-srv audit]# tail /var/log/audit/audit.log 
+type=SERVICE_STOP msg=audit(1661927210.098:355): pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=fprintd comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"
+type=BPF msg=audit(1661927210.109:356): prog-id=0 op=UNLOAD
+type=SERVICE_START msg=audit(1661927269.517:357): pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=dnf-makecache comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"
+type=SERVICE_STOP msg=audit(1661927269.517:358): pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=dnf-makecache comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"
+type=BPF msg=audit(1661928046.211:359): prog-id=94 op=LOAD
+type=BPF msg=audit(1661928046.211:360): prog-id=95 op=LOAD
+type=SERVICE_START msg=audit(1661928046.259:361): pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=systemd-hostnamed comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"
+type=SERVICE_STOP msg=audit(1661928076.274:362): pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=systemd-hostnamed comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'UID="root" AUID="unset"
+type=BPF msg=audit(1661928076.325:363): prog-id=0 op=UNLOAD
+type=BPF msg=audit(1661928076.325:364): prog-id=0 op=UNLOAD
+[root@MiWiFi-R4A-srv audit]#
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+НА ДОРАБОТКЕ 3
+31.08.2022 21:28
+Здравствуйте!
+
+Вы уверены что ForwardToSyslog=yes действительно необходимо ?
+п.2 требуется чтобы подтвердить что логи действительно пишутся в формате sysylog. Файл аудита это вообще не то. Либо разберитесь как сделать то же самое на федоре, или просто сделайте задание на Ubuntu.
+06.09.2022 10:11
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+06.09.2022 10:11
+1. Настройте вашу систему так, чтобы все логи из journald отправлялись демону syslog (в зависимости от того, что по умолчанию поставляет дистрибутив).
+У меня есть локально система Oracle Linux и там есть автоматическое подтягивание логов из journald 
+А на убунте нет. РАздел модулей выглядит так:
+#################
+#### MODULES ####
+#################
+
+module(load="imuxsock") # provides support for local system logging
+#module(load="immark")  # provides --MARK-- message capability
+
+# provides UDP syslog reception
+#module(load="imudp")
+#input(type="imudp" port="514")
+
+# provides TCP syslog reception
+#module(load="imtcp")
+#input(type="imtcp" port="514")
+
+# provides kernel logging support and enable non-kernel klog messages
+module(load="imklog" permitnonkernelfacility="on")
+
+
+На убунте можно либо добавить модуль либо включить отправку на journalctl
+Module:
+module(load="imjournal" 	    # provides access to the systemd journal
+       StateFile="imjournal.state") # File to store the position in the journal
+
+Я добавил настройку в journald
+Journald settings:
+root@epdavvtit50vgk6hbnkn:/etc# cat /etc/systemd/journald.conf | grep -v '#'
+[Journal]
+Storage=persistent
+ForwardToSyslog=yes
+
+
+2. Выведите последние 10 строк из файла /var/log/auth.log (команду и вывод сохраните).
+root@epdavvtit50vgk6hbnkn:/etc# tail /var/log/auth.log
+Sep  6 06:45:46 epdavvtit50vgk6hbnkn sshd[24058]: error: kex_exchange_identification: banner line contains invalid characters
+Sep  6 06:45:53 epdavvtit50vgk6hbnkn sshd[24059]: error: kex protocol error: type 30 seq 1 [preauth]
+Sep  6 06:45:58 epdavvtit50vgk6hbnkn sshd[24059]: Connection reset by 164.52.24.169 port 58160 [preauth]
+Sep  6 06:56:31 epdavvtit50vgk6hbnkn sshd[24071]: Accepted publickey for yc-user from 178.140.46.78 port 33114 ssh2: RSA SHA256:OgpPR+cxdp6odgDHh+HGdv95+JpWB1q6afehtU3H9wk
+Sep  6 06:56:31 epdavvtit50vgk6hbnkn sshd[24071]: pam_unix(sshd:session): session opened for user yc-user by (uid=0)
+Sep  6 06:56:31 epdavvtit50vgk6hbnkn systemd-logind[525]: New session 5 of user yc-user.
+Sep  6 06:56:33 epdavvtit50vgk6hbnkn sudo:  yc-user : TTY=pts/1 ; PWD=/home/yc-user ; USER=root ; COMMAND=/usr/bin/su
+Sep  6 06:56:33 epdavvtit50vgk6hbnkn sudo: pam_unix(sudo:session): session opened for user root by yc-user(uid=0)
+Sep  6 06:56:33 epdavvtit50vgk6hbnkn su: (to root) yc-user on pts/1
+Sep  6 06:56:33 epdavvtit50vgk6hbnkn su: pam_unix(su:session): session opened for user root by yc-user(uid=0)
+root@epdavvtit50vgk6hbnkn:/etc# 
+
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 5
+06.09.2022 20:32
+Добрый день, очень хорошо что разобрались. Вообще ForwardToSyslog=yes предназначена для старых версий syslog, которые не умеют сами читать журнал, у вас rsyslog, он умеет.
+
