@@ -1,0 +1,140 @@
+Задание:
+На вашем сервере запустите FreeIPA с доступом извне.
+Создайте группу webadmins.
+Создайте двух пользователей - с правами администратора (siteadmin) и пользователя (user) - через Web UI.
+Добавьте пользователя siteadmin в группу webadmins.
+На вашем сервере запустите nginx и настройте на нем вход при помощи LDAP параметров, за которыми будут спрятаны 2 location:
+/admin/ - статическая страница с текстом "Hello, admin", на которую может заходить пользователь, находящийся в группе webadmins;
+/user/ - статическая страница с текстом "Hello, user", на которую может заходить любой пользователь, зарегистрированный в FreeIPA.
+Для проверки отправьте URL для доступа к FreeIPA Web UI и защищенным locations, пароли от обоих пользователей к FreeIPA и конфигурационный файл nginx.
+
+
+****************************************************************************
+Решение
+****************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+20.11.2022 00:37
+1. На вашем сервере запустите FreeIPA с доступом извне.
+ address: 158.160.13.11
+ 
+ mkdir -p /opt/freeipa-data
+ 
+ apt update
+ apt install docker.io
+ 
+docker run -it -d --name freeipa --hostname freeipa.efoshkin.ru --volume /opt/freeipa-data/:/data --publish "443:443" --publish "80:80" --publish "389:389" --publish "636:636" --publish "88:88" --publish "88:88/udp" --publish "464:464" --publish "464:464/udp" -v /sys/fs/cgroup:/sys/fs/cgroup:ro --tmpfs /run --tmpfs /tmp --security-opt seccomp=unconfined --sysctl net.ipv6.conf.all.disable_ipv6=0 freeipa/freeipa-server:centos-8-4.8.4
+ 
+root@epda1vjq7macji3kojm0:/home/yc-user# docker images
+REPOSITORY               TAG              IMAGE ID       CREATED       SIZE
+freeipa/freeipa-server   centos-8-4.8.4   7d906ba6bfe4   2 years ago   868MB
+
+Domain: efoshkin.ru
+Directory Manager password: Direct_Me
+IPA admin password: IPA_admin
+
+kinit admin
+
+# на убунту хосте
+vi /etc/hosts 
+127.0.0.1  freeipa.efoshkin.ru
+
+# На локальной машние
+vi /etc/hosts
+158.160.13.11 freeipa.efoshkin.ru
+
+5. На вашем сервере запустите nginx и настройте на нем вход при помощи LDAP параметров, за которыми будут спрятаны 2 location:
+apt install nginx
+git clone https://github.com/nginxinc/nginx-ldap-auth.git /opt/nginx-ldap-auth
+cd /opt/nginx-ldap-auth
+ 
+# Библиотеки питон
+docker build -t nginx-ldap-auth-daemon .
+docker run -d -p 8888:8888 nginx-ldap-auth-daemon
+ 
+# Чтобы посмотреть правильный путь в ldap к нужной группе или пользователю нужно вывести структуру лдап, подключившись через админа.
+ldapsearch -x -b "dc=efoshkin,dc=ru" -H ldap://158.160.13.11:389 -D "uid=admin,cn=users,cn=accounts,dc=efoshkin,dc=ru" -W 
+
+К примеру узнать путь к webadmins
+ldapsearch -x -b "dc=efoshkin,dc=ru" -H ldap://158.160.13.11:389 -D "uid=admin,cn=users,cn=accounts,dc=efoshkin,dc=ru" -w IPA_admin | grep webadmins
+dn: cn=webadmins,cn=groups,cn=accounts,dc=efoshkin,dc=ru
+
+# for /user
+ldapsearch -x -b "dc=efoshkin,dc=ru" -H ldap://158.160.13.11:389 -D "uid=admin,cn=users,cn=accounts,dc=efoshkin,dc=ru" -w IPA_admin | grep ipausers
+cn=ipausers,cn=groups,cn=accounts,dc=efoshkin,dc=ru
+
+**************************************
+Дальше идет конфиг nginx
+**************************************
+
+cat /etc/nginx/sites-enabled/default
+server {
+	listen 8080 default_server;
+	root /var/www/html;
+	server_name rebrainme;
+
+
+	location = /auth {
+            internal;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_pass http://127.0.0.1:8888;
+            proxy_set_header X-Ldap-URL "ldap://158.160.13.11:389";
+            proxy_set_header X-Ldap-BaseDN "dc=efoshkin,dc=ru";
+            proxy_set_header X-Ldap-BindDN "uid=admin,cn=users,cn=accounts,dc=efoshkin,dc=ru";
+	    proxy_set_header X-Ldap-BindPass "IPA_admin";
+	    proxy_set_header X-CookieName "nginxauth";
+	    proxy_set_header Cookie nginxauth=$cookie_nginxauth;
+            proxy_set_header X-Ldap-Template "(&(uid=%(username)s)(memberOf=cn=webadmins,cn=groups,cn=accounts,dc=efoshkin,dc=ru))";
+}
+
+        location  / {
+ 	    autoindex  on;         
+        }
+
+        location  /admin{
+            auth_request /auth;
+	    error_page 401 =200 /admin;
+        }
+
+
+	location = /user_auth {
+            internal;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_pass http://127.0.0.1:8888;
+            proxy_set_header X-Ldap-URL "ldap://158.160.13.11:389";
+            proxy_set_header X-Ldap-BaseDN "dc=efoshkin,dc=ru";
+            proxy_set_header X-Ldap-BindDN "uid=admin,cn=users,cn=accounts,dc=efoshkin,dc=ru";
+            proxy_set_header X-Ldap-BindPass "IPA_admin";
+            proxy_set_header X-CookieName "nginxauth";
+	    proxy_set_header Cookie nginxauth=$cookie_nginxauth;
+            proxy_set_header X-Ldap-Template "(&(uid=%(username)s)(memberOf=cn=ipausers,cn=groups,cn=accounts,dc=efoshkin,dc=ru))";
+
+}
+	location  /user {
+            auth_request /user_auth;
+	    error_page 401 =200 /user;
+        }
+
+}
+
+Проверка
+http://158.160.13.11:8080/
+Пароли
+admin       IPA_admin
+siteadmin  IPA_admin
+user           user
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+20.11.2022 20:09
+Добрый день!
+
+По итогам обсуждения:
+
+в контейнере всегда свой loopback/127.0.0.1. Если скрипт запущен в контейнере, то при передачи ему URL'а к FreeIPA через заголовок нельзя было использовать Loopback, т.к. он обращался не к loopback хоста, а к своему собственному. Рабочее решение - внешний IP. Есть еще вариант работы через имя контейнера, но тогда они должны быть в одной сети докера
+шаблон (&(uid=%(username)s)
+возможное зацикливание запросов через proxy_pass
+Отличные знание темы и выполнение задания, хорошо что доводите задание до решения, замечаний и вопросов нет!
