@@ -1,0 +1,307 @@
+Задание:
+Установите веб-сервер nginx (если в вашей системе он еще не установлен).
+Создайте новый virtual host, соответствующий следующим требованиям:
+слушает только на локальном порту 8880;
+пишет access и error логи в файлы /var/log/rotated.access.log и /var/log/rotated.error.log соответственно.
+Напишите правило logrotate, соответствующее следующим требованиям:
+целью правила должны быть логи, указанные в virtual host;
+производить ротацию при объеме файла более 100 килобайт;
+держать 3 архивных лога;
+первый архивный лог НЕ должен сжиматься;
+не ротировать лог, если он пустой;
+после ротации отправлять приложению сигнал на переоткрытие лога только один раз для всех файлов.
+Напишите скрипт, который отправит 2000 запросов на ваш новый virtual host, для того чтобы сгенерировать необходимый объем логов.
+Вручную вызовите logrotate для ротации логов.
+Выведите список всех созданных логов вашего virtual host с указанием объемов файлов в человекочитаемом формате.
+Повторите запросы для заполнения логов.
+Вручную вызовите logrotate для ротации логов
+Выведите список всех созданных логов вашего virtual host с указанием объемов файлов в человекочитаемом формате.
+На проверку отправьте конфигурационный файл nginx, правило logrotate и все сохраненные команды с их выводами.
+
+****************************************************************************
+Решение
+****************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+30.08.2022 21:07
+1. Установите веб-сервер nginx (если в вашей системе он еще не установлен).
+address: 158.160.2.228
+apt update & apt upgrade
+sudo apt install nginx-full
+
+2. Создайте новый virtual host, соответствующий следующим требованиям:
+root@epdlv1e36q3h3fs0ru5j:/etc/nginx# cat sites-enabled/logrotate_http 
+server {
+       listen 8880 default_server;
+       listen [::]:8880 default_server;
+       access_log /var/log/rotated.access.log;
+       error_log  /var/log/rotated.error.log;
+       server_name 158.160.2.228.nip.io;
+       root /var/www/html;
+       location / {
+  	      index index.nginx-debian.html;
+              try_files  $uri $uri/ =404;
+       }
+}
+
+http://158.160.2.228.nip.io:8880/
+3. Напишите правило logrotate, соответствующее следующим требованиям:
+vi /etc/logrotate.d/nginx
+
+/var/log/rotated.access.log /var/log/rotated.error.log {
+	size = 100K
+	rotate 3
+	delaycompress
+	notifempty
+	sharedscripts
+	postrotate
+            /usr/bin/killall -HUP nginx
+   	endscript
+}
+
+4. Напишите скрипт, который отправит 2000 запросов на ваш новый virtual host, для того чтобы сгенерировать необходимый объем логов.
+root@epdlv1e36q3h3fs0ru5j:/home/yc-user# cat ./script 
+for i in $(seq 1 2000);
+do
+   curl http://158.160.2.228.nip.io:8880/
+done
+root@epdlv1e36q3h3fs0ru5j:/home/yc-user# 
+
+root@epdlv1e36q3h3fs0ru5j:/home/yc-user# cat /var/log/rotated.access.log  | wc -l
+2010
+root@epdlv1e36q3h3fs0ru5j:/home/yc-user# 
+
+systemctl restart logrotate
+
+5. Вручную вызовите logrotate для ротации логов.
+logrotate /var/log/rotated.access.log
+
+ ll /var/log/rotated.* -h
+-rw-r--r-- 1 root root    0 Aug 30 17:38 /var/log/rotated.access.log
+-rw-r--r-- 1 root root 178K Aug 30 17:32 /var/log/rotated.access.log.1
+-rw-r--r-- 1 root root    0 Aug 30 06:55 /var/log/rotated.error.log
+
+
+6. Повторный вызов
+./script
+
+ ll /var/log/rotated.* -h
+-rw-r--r-- 1 root root 176K Aug 30 17:42 /var/log/rotated.access.log
+-rw-r--r-- 1 root root 178K Aug 30 17:32 /var/log/rotated.access.log.1
+-rw-r--r-- 1 root root    0 Aug 30 06:55 /var/log/rotated.error.log
+
+root@epdlv1e36q3h3fs0ru5j:/home/yc-user# cat /var/log/rotated.access.log | tail
+158.160.2.228 - - [30/Aug/2022:17:42:56 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.68.0"
+158.160.2.228 - - [30/Aug/2022:17:42:56 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.68.0"
+158.160.2.228 - - [30/Aug/2022:17:42:56 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.68.0"
+158.160.2.228 - - [30/Aug/2022:17:42:56 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.68.0"
+158.160.2.228 - - [30/Aug/2022:17:42:56 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.68.0"
+158.160.2.228 - - [30/Aug/2022:17:42:56 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.68.0"
+158.160.2.228 - - [30/Aug/2022:17:42:56 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.68.0"
+158.160.2.228 - - [30/Aug/2022:17:42:56 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.68.0"
+158.160.2.228 - - [30/Aug/2022:17:42:56 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.68.0"
+158.160.2.228 - - [30/Aug/2022:17:42:56 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.68.0"
+
+Выдает ошибку 
+error: /var/log/rotated.access.log:1998 lines must begin with a keyword or a filename (possibly in double quotes)
+error: /var/log/rotated.access.log:1999 lines must begin with a keyword or a filename (possibly in double quotes)
+error: /var/log/rotated.access.log:2000 lines must begin with a keyword or a filename (possibly in double quotes)
+root@epdlv1e36q3h3fs0ru5j:/home/yc-user# systemctl status logrotate
+● logrotate.service - Rotate log files
+     Loaded: loaded (/lib/systemd/system/logrotate.service; static; vendor preset: enabled)
+     Active: inactive (dead) since Tue 2022-08-30 17:38:38 UTC; 9min ago
+TriggeredBy: ● logrotate.timer
+       Docs: man:logrotate(8)
+             man:logrotate.conf(5)
+    Process: 20461 ExecStart=/usr/sbin/logrotate /etc/logrotate.conf (code=exited, status=0/SUCCESS)
+   Main PID: 20461 (code=exited, status=0/SUCCESS)
+
+Aug 30 17:38:38 epdlv1e36q3h3fs0ru5j systemd[1]: Starting Rotate log files...
+Aug 30 17:38:38 epdlv1e36q3h3fs0ru5j systemd[1]: logrotate.service: Succeeded.
+Aug 30 17:38:38 epdlv1e36q3h3fs0ru5j systemd[1]: Finished Rotate log files.
+
+systemctl restart logrotate
+ logrotate -f /var/log/rotated.access.log 
+Получилось после рестарта
+
+ ll /var/log/rotated.* -h
+-rw-r--r-- 1 root root    0 Aug 30 17:48 /var/log/rotated.access.log
+-rw-r--r-- 1 root root 176K Aug 30 17:42 /var/log/rotated.access.log.1
+-rw-r--r-- 1 root root 178K Aug 30 17:32 /var/log/rotated.access.log.2
+-rw-r--r-- 1 root root    0 Aug 30 06:55 /var/log/rotated.error.log
+
+10. Вывод конфигов nginx, logrotate
+root@epdlv1e36q3h3fs0ru5j:/etc/nginx# cat sites-enabled/logrotate_http 
+server {
+       listen 8880 default_server;
+       listen [::]:8880 default_server;
+       access_log /var/log/rotated.access.log;
+       error_log  /var/log/rotated.error.log;
+       server_name 158.160.2.228.nip.io;
+       root /var/www/html;
+       location / {
+  	      index index.nginx-debian.html;
+              try_files  $uri $uri/ =404;
+       }
+}
+
+
+root@epdlv1e36q3h3fs0ru5j:/etc# cat logrotate.d/nginx 
+/var/log/nginx/*.log {
+	daily
+	missingok
+	rotate 14
+	compress
+	delaycompress
+	notifempty
+	create 0640 www-data adm
+	sharedscripts
+	prerotate
+		if [ -d /etc/logrotate.d/httpd-prerotate ]; then \
+			run-parts /etc/logrotate.d/httpd-prerotate; \
+		fi \
+	endscript
+	postrotate
+		invoke-rc.d nginx rotate >/dev/null 2>&1
+	endscript
+}
+
+/var/log/rotated.access.log /var/log/rotated.error.log {
+	size = 100K
+	rotate 3
+	delaycompress
+	notifempty
+	sharedscripts
+	postrotate
+            /usr/bin/killall -HUP nginx
+   	endscript
+}
+
+
+Почемуто в кроне нет logrotate. 
+Я так понимаю его нужно руками добавлять?? 
+ 0 1 * * * /opt/sbin/logrotate -s $HOME/logs/logrotate.state $HOME/etc/logrotate.conf
+
+root@epdlv1e36q3h3fs0ru5j:/etc# cat crontab
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name command to be executed
+17 *	* * *	root    cd / && run-parts --report /etc/cron.hourly
+25 6	* * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
+47 6	* * 7	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
+52 6	1 * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
+#
+root@epdlv1e36q3h3fs0ru5j:/etc# 
+
+`
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 4
+31.08.2022 21:15
+Добрый день, вижу что скрипт в целом работает, но есть вопросы.
+
+Для чего вот эта секция в конфиге логротейта "/var/log/nginx/*.log ", ваши логи в другом каталоге. Впрочем видимо это стандартная секция и нашему запуску она не мешает.
+по поводу ошибок при ротировании, надо посмотреть что в строках файла 1998-2000
+почему у вас логи не сжимаются ?
+Я так понимаю его нужно руками добавлять??
+
+Существуют разные варианты запуска, например через /etc/cron.daily/logrotate, но в вашей системе запуск видимо происходит не через cron, а через systemd.timer.
+
+06.09.2022 09:43
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+06.09.2022 09:43
+1. Установка
+address: 130.193.53.114
+apt update & apt upgrade
+sudo apt install nginx-full
+
+root@epdavvtit50vgk6hbnkn:/etc/nginx/sites-enabled# cat logrotate 
+server {
+       listen 8880 default_server;
+       listen [::]:8880 default_server;
+       access_log /var/log/rotated.access.log;
+       error_log  /var/log/rotated.error.log;
+       server_name 130.193.53.114.nip.io;
+       root /var/www/html;
+       location / {
+  	      index index.nginx-debian.html;
+              try_files  $uri $uri/ =404;
+       }
+}
+root@epdavvtit50vgk6hbnkn:/etc/nginx/sites-enabled# 
+systemctl restart nginx
+
+
+Logrotate rules:
+vi /etc/logrotate.d/nginx
+root@epdavvtit50vgk6hbnkn:/var/log# cat /etc/logrotate.d/nginx 
+/var/log/rotated.access.log 
+/var/log/rotated.error.log 
+{
+	size = 100K
+	rotate 3
+ 	compress
+	delaycompress
+	notifempty
+	sharedscripts
+	postrotate
+            /usr/bin/killall -HUP nginx
+   	endscript
+}
+root@epdavvtit50vgk6hbnkn:/var/log# 
+systemctl restart logrotate
+
+script:
+root@epdavvtit50vgk6hbnkn:/opt/logrotate# cat /opt/logrotate/script 
+for i in $(seq 1 2000);
+do
+   curl http://130.193.53.114.nip.io:8880/
+done
+root@epdavvtit50vgk6hbnkn:/opt/logrotate# 
+
+Запуск скрипта
+./script
+
+Проверяем
+root@epdavvtit50vgk6hbnkn:/var/log# ll rotated.* -h
+-rw-r--r-- 1 root root 179K Sep  6 06:21 rotated.access.log
+-rw-r--r-- 1 root root    0 Sep  6 06:20 rotated.error.log
+root@epdavvtit50vgk6hbnkn:/var/log#
+
+Вызываем повторно скрипт:
+/opt/logrotate/script
+root@epdavvtit50vgk6hbnkn:/var/log# ll rotated.* -h
+-rw-r--r-- 1 root root 178K Sep  6 06:38 rotated.access.log
+-rw-r--r-- 1 root root 179K Sep  6 06:21 rotated.access.log.1
+-rw-r--r-- 1 root root    0 Sep  6 06:20 rotated.error.log
+root@epdavvtit50vgk6hbnkn:/var/log# 
+
+Вызываем логротейт:
+
+root@epdavvtit50vgk6hbnkn:/var/log# systemctl restart logrotate
+root@epdavvtit50vgk6hbnkn:/var/log# logrotate /var/log/rotated.access.log 
+root@epdavvtit50vgk6hbnkn:/var/log# ll rotated.* -h
+-rw-r--r-- 1 root root    0 Sep  6 06:40 rotated.access.log
+-rw-r--r-- 1 root root 178K Sep  6 06:38 rotated.access.log.1
+-rw-r--r-- 1 root root 1.1K Sep  6 06:21 rotated.access.log.2.gz
+-rw-r--r-- 1 root root    0 Sep  6 06:20 rotated.error.log
+root@epdavvtit50vgk6hbnkn:/var/log# 
+
+
