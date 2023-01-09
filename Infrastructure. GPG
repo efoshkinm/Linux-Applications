@@ -1,0 +1,320 @@
+Задание:
+Сгенерируйте ключ при помощи флага --gen-key (команды и вывод сохраните)
+Выведете список публичных и приватных ключей (команды и вывод сохраните)
+У созданного ключа удалите дату истечения (команды и вывод сохраните)
+Выведете список публичных и приватных ключей (команды и вывод сохраните)
+Экспортируйте публичный ключ в файл в ASCII формате и выведете его (команды и вывод сохраните)
+Экспортируйте приватный в бинарном виде в файл (команду и вывод сохраните)
+Зашифруйте строку RebrainMe Linux ASYM при помощи сгенерированного ключа в ASCII формате и выведете этот файл (команды и вывод сохраните)
+Зашифруйте файл с приватным ключем при помощи passphrase secret в ASCII формате и выведете этот файл (команды и вывод сохраните)
+Удалите из вашего хранилища публичный и приватный ключ (команды и вывод сохраните)
+Выведете список публичных и приватных ключей (команды и вывод сохраните)
+Расшифруйте приватный ключ и импортируйте одной командой (команды и вывод сохраните)
+Выведете список публичных и приватных ключей (команды и вывод сохраните)
+Расшифруйте файл с зашифрованной строкой (команды и вывод сохраните)
+Отправьте на проверку все сохраненные выводы
+
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+02.11.2022 09:59
+1. Сгенерируйте ключ при помощи флага --gen-key (команды и вывод сохраните)
+[m.efoshkin@fedora gnupg]$ gpg --gen-key
+gpg (GnuPG) 2.3.7; Copyright (C) 2021 Free Software Foundation, Inc.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+gpg: directory '/home/m.efoshkin/.gnupg' created
+gpg: keybox '/home/m.efoshkin/.gnupg/pubring.kbx' created
+Note: Use "gpg --full-generate-key" for a full featured key generation dialog.
+
+GnuPG needs to construct a user ID to identify your key.
+
+Real name: Max
+Email address: m.efoshkin@yandex.ru
+You selected this USER-ID:
+    "Max <m.efoshkin@yandex.ru>"
+
+Change (N)ame, (E)mail, or (O)kay/(Q)uit? O
+We need to generate a lot of random bytes. It is a good idea to perform
+some other action (type on the keyboard, move the mouse, utilize the
+disks) during the prime generation; this gives the random number
+generator a better chance to gain enough entropy.
+We need to generate a lot of random bytes. It is a good idea to perform
+some other action (type on the keyboard, move the mouse, utilize the
+disks) during the prime generation; this gives the random number
+generator a better chance to gain enough entropy.
+gpg: /home/m.efoshkin/.gnupg/trustdb.gpg: trustdb created
+gpg: directory '/home/m.efoshkin/.gnupg/openpgp-revocs.d' created
+gpg: revocation certificate stored as '/home/m.efoshkin/.gnupg/openpgp-revocs.d/96609B3C34BD9AA921243508D270B9837D51C792.rev'
+public and secret key created and signed.
+
+pub   ed25519 2022-11-02 [SC] [expires: 2024-11-01]
+      96609B3C34BD9AA921243508D270B9837D51C792
+uid                      Max <m.efoshkin@yandex.ru>
+sub   cv25519 2022-11-02 [E] [expires: 2024-11-01]
+
+passphrase: Moscow
+
+2. Выведете список публичных и приватных ключей (команды и вывод сохраните)
+[m.efoshkin@fedora gnupg]$  gpg --list-keys
+gpg: checking the trustdb
+gpg: marginals needed: 3  completes needed: 1  trust model: pgp
+gpg: depth: 0  valid:   1  signed:   0  trust: 0-, 0q, 0n, 0m, 0f, 1u
+gpg: next trustdb check due at 2024-11-01
+/home/m.efoshkin/.gnupg/pubring.kbx
+-----------------------------------
+pub   ed25519 2022-11-02 [SC] [expires: 2024-11-01]
+      96609B3C34BD9AA921243508D270B9837D51C792
+uid           [ultimate] Max <m.efoshkin@yandex.ru>
+sub   cv25519 2022-11-02 [E] [expires: 2024-11-01]
+
+[m.efoshkin@fedora gnupg]$ gpg --list-secret-keys
+/home/m.efoshkin/.gnupg/pubring.kbx
+-----------------------------------
+sec   ed25519 2022-11-02 [SC] [expires: 2024-11-01]
+      96609B3C34BD9AA921243508D270B9837D51C792
+uid           [ultimate] Max <m.efoshkin@yandex.ru>
+ssb   cv25519 2022-11-02 [E] [expires: 2024-11-01]
+
+[m.efoshkin@fedora gnupg]$ 
+
+3. У созданного ключа удалите дату истечения (команды и вывод сохраните)
+[m.efoshkin@fedora gnupg]$ gpg --edit-key max
+gpg (GnuPG) 2.3.7; Copyright (C) 2021 Free Software Foundation, Inc.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Secret key is available.
+
+sec  ed25519/D270B9837D51C792
+     created: 2022-11-02  expires: 2024-11-01  usage: SC  
+     trust: ultimate      validity: ultimate
+ssb  cv25519/BBC179E67BB08E53
+     created: 2022-11-02  expires: 2024-11-01  usage: E   
+[ultimate] (1). Max <m.efoshkin@yandex.ru>
+
+gpg> expire 
+Changing expiration time for the primary key.
+Please specify how long the key should be valid.
+         0 = key does not expire
+      <n>  = key expires in n days
+      <n>w = key expires in n weeks
+      <n>m = key expires in n months
+      <n>y = key expires in n years
+Key is valid for? (0) 
+Key does not expire at all
+Is this correct? (y/N) y
+
+sec  ed25519/D270B9837D51C792
+     created: 2022-11-02  expires: never       usage: SC  
+     trust: ultimate      validity: ultimate
+ssb  cv25519/BBC179E67BB08E53
+     created: 2022-11-02  expires: 2024-11-01  usage: E   
+[ultimate] (1). Max <m.efoshkin@yandex.ru>
+
+gpg> 
+
+
+4. Выведете список публичных и приватных ключей (команды и вывод сохраните)
+gpg> list 
+
+sec  ed25519/D270B9837D51C792
+     created: 2022-11-02  expires: never       usage: SC  
+     trust: ultimate      validity: ultimate
+ssb  cv25519/BBC179E67BB08E53
+     created: 2022-11-02  expires: 2024-11-01  usage: E   
+[ultimate] (1). Max <m.efoshkin@yandex.ru>
+
+gpg> save
+
+[m.efoshkin@fedora gnupg]$ gpg --list-secret-keys
+/home/m.efoshkin/.gnupg/pubring.kbx
+-----------------------------------
+sec   ed25519 2022-11-02 [SC]
+      96609B3C34BD9AA921243508D270B9837D51C792
+uid           [ultimate] Max <m.efoshkin@yandex.ru>
+ssb   cv25519 2022-11-02 [E] [expires: 2024-11-01]
+
+[m.efoshkin@fedora gnupg]$  gpg --list-keys
+/home/m.efoshkin/.gnupg/pubring.kbx
+-----------------------------------
+pub   ed25519 2022-11-02 [SC]
+      96609B3C34BD9AA921243508D270B9837D51C792
+uid           [ultimate] Max <m.efoshkin@yandex.ru>
+sub   cv25519 2022-11-02 [E] [expires: 2024-11-01]
+
+5. Экспортируйте публичный ключ в файл в ASCII формате и выведете его (команды и вывод сохраните)
+[m.efoshkin@fedora gnupg]$ gpg --armor --export max
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEY2H8wxYJKwYBBAHaRw8BAQdAeDjzS1UQhpW/YqGF4+prJHg45M6JsYwapuzr
+zCa5+zi0Gk1heCA8bS5lZm9zaGtpbkB5YW5kZXgucnU+iJMEExYKADsCGwMFCwkI
+BwICIgIGFQoJCAsCBBYCAwECHgcCF4AWIQSWYJs8NL2aqSEkNQjScLmDfVHHkgUC
+Y2H/8AAKCRDScLmDfVHHkkMeAP90zpj8DWjPZ39ilI5jGZhlIv8Y7rLH7AMX4SXL
+uMsejgD7BPwo/C+Wmq7793WWq8rAew0kFk5boM9Han3tLwgPfAC4OARjYfzDEgor
+BgEEAZdVAQUBAQdAaCMOQSK8GAncJUwlD0Q0o5/FQD851NVHcZJFP3JAuSQDAQgH
+iH4EGBYKACYWIQSWYJs8NL2aqSEkNQjScLmDfVHHkgUCY2H8wwIbDAUJA8JnAAAK
+CRDScLmDfVHHkrSpAQDW+4Wtq0kN76ufca51g1NaCyaueEo8CYb7Jux6jNx+lgEA
+u8hqdcQ8wJHxeukbmlux3OqpeRVQfU+SEmMbo3mw/QM=
+=0g8M
+-----END PGP PUBLIC KEY BLOCK-----
+[m.efoshkin@fedora gnupg]$ 
+
+6. Экспортируйте приватный в бинарном виде в файл (команду и вывод сохраните)
+[m.efoshkin@fedora .gnupg]$ gpg  --export-secret-keys max > priv.key
+[m.efoshkin@fedora .gnupg]$ cat priv.key 
+5�m/�Y���^C��$0w*u�2�л��si��{�����´�Max <m.efoshkin@yandex.ru>���B}�M�
+;
+ 	
+	
+       !�`�<4���!$�p��}Qǒca��
+$N[��Gj}�|��ca��˸����(�/�����u����{
++�U@h#A"�	�%L%D4���@?9��Gq�E?r@��+E���� ��g5_r�!���eD8���s�Zb�-������vs��a����Tz}�C\��c�i��	f��$��uO��~
+&!�`�<4���!$�p��}Qǒca��
+                       	g
+﫟q�u�SZ�p��}Qǒ�������I
+        &�xJ<	��&�z��~���ju�<���z�[���yP}O�cy��[m.efoshkin@fedora .gnupg]$ 
+
+7. Зашифруйте строку RebrainMe Linux ASYM при помощи сгенерированного ключа в ASCII формате и выведете этот файл (команды и вывод сохраните)
+echo 'RebrainMe Linux ASYM' > doc
+[m.efoshkin@fedora .gnupg]$ gpg --recipient m.efoshkin@yandex.ru --encrypt --armor doc
+[m.efoshkin@fedora .gnupg]$
+
+[m.efoshkin@fedora .gnupg]$ cat doc.asc 
+-----BEGIN PGP MESSAGE-----
+
+hF4Du8F55nuwjlMSAQdADfHaIL6Y9rJyoVZ9nR6puqxl2yu5L5pbxmohC84uHXsw
+tmkOvt/vloM0u5hIabirP88NYYCwSYRZ260li32e+HJedoOvFV/11tBNArjTjdQ0
+1F0BCQIQeV4QwTo62w6WNRTpbqjcRy+3ZD6t0MUDudxda1qGR1TBleh44uG2W05O
+8/FzoKmr0SRVYZvooUTko1ETq5ziZ3UL4HkUVvBfuDR+gvcFu3H96COVtBJyMmk=
+=QHRT
+-----END PGP MESSAGE-----
+[m.efoshkin@fedora .gnupg]$ 
+
+8. Зашифруйте файл с приватным ключем при помощи passphrase secret в ASCII формате и выведете этот файл (команды и вывод сохраните.
+[m.efoshkin@fedora .gnupg]$ gpg --armor --export-secret-keys  max > priv_ascii.key
+[m.efoshkin@fedora .gnupg]$ cat priv_ascii.key 
+-----BEGIN PGP PRIVATE KEY BLOCK-----
+
+lIYEY2H8wxYJKwYBBAHaRw8BAQdAeDjzS1UQhpW/YqGF4+prJHg45M6JsYwapuzr
+zCa5+zj+BwMCsAgHDcE+QWP46ChgfryY2ixvhU30d2I77ZWelD00JbB/J23O6nYu
+9Mc7CZDM3Scu/++pSOs3xixMIsL9YpGBf1UIBpnHUAylIiZ9+OTJtLQaTWF4IDxt
+LmVmb3Noa2luQHlhbmRleC5ydT6IkwQTFgoAOwIbAwULCQgHAgIiAgYVCgkICwIE
+FgIDAQIeBwIXgBYhBJZgmzw0vZqpISQ1CNJwuYN9UceSBQJjYf/wAAoJENJwuYN9
+UceSQx4A/3TOmPwNaM9nf2KUjmMZmGUi/xjussfsAxfhJcu4yx6OAPsE/Cj8L5aa
+rvv3dZarysB7DSQWTlugz0dqfe0vCA98AJyLBGNh/MMSCisGAQQBl1UBBQEBB0Bo
+Iw5BIrwYCdwlTCUPRDSjn8VAPznU1UdxkkU/ckC5JAMBCAf+BwMCjM9srplwgQb4
+An/rrCGrHhEpdONVaSRX+YgUkK+wvAIlIdw/dCYxmVQGReN9N0bDAr6T86WfvGjI
+dIaQg09JAPOg0oBMmoqpoDrhfAnuA4h+BBgWCgAmFiEElmCbPDS9mqkhJDUI0nC5
+g31Rx5IFAmNh/MMCGwwFCQPCZwAACgkQ0nC5g31Rx5K0qQEA1vuFratJDe+rn3Gu
+dYNTWgsmrnhKPAmG+ybseozcfpYBALvIanXEPMCR8XrpG5pbsdzqqXkVUH1PkhJj
+G6N5sP0D
+=To+2
+-----END PGP PRIVATE KEY BLOCK-----
+[m.efoshkin@fedora .gnupg]$ 
+
+[m.efoshkin@fedora .gnupg]$ gpg --symmetric priv_ascii.key 
+[m.efoshkin@fedora .gnupg]$ cat priv_ascii.key.gpg 
+��67�e����71E��J{ >�Y\��
+��-�B﫸��e0��@�LAXI:tR��<�-��b��� �u�
+                                     ��ˡ��|E�&ڮ$��Q��1�׳a-Un4��cW����iO�
+�I��$RK��ʻ�d솫�Oo[\���<�j�
+                          +
+F�Y�EuB}�Y�:��a|�ٔ�D�O��x���ԗP3����,��b��Ju.�[���즙f�N�Y���]m�R�O>�P�C���J��Ll�r]���A�Y���m����
+��T��M�7 b
+          �}�@'��D"�-e(���|�G�঺&��Xy�1H|�̬
+�N�M-�ؿ]�+�B�;��M����E�����6�9~�w���ߗ���'���}���脂�,��l��dG'L(�JdX7<y6yޜ�gz�,
+                                                                             �Q6j���6@'·��A�g�i�����
+              �t��2`ś�z?���4� HB� N#*=�#xc
+VEk�!P(�/�
+�dt��oqr�/"�2ʦ�S����>�e�AFݥfl�l�nWj��mf�t�HM�����*���Fp�{1��TZҨ
+                                                               �S�s,�����ţ���=,Q�=܋a�qj �Z�WJd m�3xX�ך�)�H%��.�1=�E
+                             ;���,��[m.efoshkin@fedora .gnupg]$ 
+
+9. Удалите из вашего хранилища публичный и приватный ключ (команды и вывод сохраните)
+[m.efoshkin@fedora .gnupg]$ gpg --delete-secret-keys max
+gpg (GnuPG) 2.3.7; Copyright (C) 2021 Free Software Foundation, Inc.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+
+sec  ed25519/D270B9837D51C792 2022-11-02 Max <m.efoshkin@yandex.ru>
+
+Delete this key from the keyring? (y/N) y
+This is a secret key! - really delete? (y/N) y
+[m.efoshkin@fedora .gnupg]$ 
+
+[m.efoshkin@fedora .gnupg]$ gpg --delete-keys max
+gpg (GnuPG) 2.3.7; Copyright (C) 2021 Free Software Foundation, Inc.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+
+pub  ed25519/D270B9837D51C792 2022-11-02 Max <m.efoshkin@yandex.ru>
+
+Delete this key from the keyring? (y/N) y
+[m.efoshkin@fedora .gnupg]$ 
+
+
+10. Выведете список публичных и приватных ключей (команды и вывод сохраните)
+[m.efoshkin@fedora .gnupg]$ gpg --list-keys
+gpg: checking the trustdb
+gpg: no ultimately trusted keys found
+[m.efoshkin@fedora .gnupg]$ gpg --list-secret-keys
+[m.efoshkin@fedora .gnupg]$ 
+
+11. Расшифруйте приватный ключ и импортируйте одной командой (команды и вывод сохраните)
+[m.efoshkin@fedora .gnupg]$ gpg --output recovered.key --decrypt priv_ascii.key.gpg && gpg --import recovered.key
+gpg: AES256.CFB encrypted data
+gpg: encrypted with 1 passphrase
+gpg: key D270B9837D51C792: public key "Max <m.efoshkin@yandex.ru>" imported
+gpg: warning: lower 3 bits of the secret key are not cleared
+gpg: key D270B9837D51C792: secret key imported
+gpg: Total number processed: 1
+gpg:               imported: 1
+gpg:       secret keys read: 1
+gpg:   secret keys imported: 1
+[m.efoshkin@fedora .gnupg]$ 
+
+12. Выведете список публичных и приватных ключей (команды и вывод сохраните)
+[m.efoshkin@fedora .gnupg]$ gpg --list-keys 
+/home/m.efoshkin/.gnupg/pubring.kbx
+-----------------------------------
+pub   ed25519 2022-11-02 [SC]
+      96609B3C34BD9AA921243508D270B9837D51C792
+uid           [ unknown] Max <m.efoshkin@yandex.ru>
+sub   cv25519 2022-11-02 [E] [expires: 2024-11-01]
+
+[m.efoshkin@fedora .gnupg]$ gpg --list-secret-keys 
+/home/m.efoshkin/.gnupg/pubring.kbx
+-----------------------------------
+sec   ed25519 2022-11-02 [SC]
+      96609B3C34BD9AA921243508D270B9837D51C792
+uid           [ unknown] Max <m.efoshkin@yandex.ru>
+ssb   cv25519 2022-11-02 [E] [expires: 2024-11-01]
+
+[m.efoshkin@fedora .gnupg]$ 
+
+13. Расшифруйте файл с зашифрованной строкой (команды и вывод сохраните)
+[m.efoshkin@fedora .gnupg]$ gpg --output recovered_doc --decrypt doc.asc 
+gpg: encrypted with cv25519 key, ID BBC179E67BB08E53, created 2022-11-02
+      "Max <m.efoshkin@yandex.ru>"
+
+[m.efoshkin@fedora .gnupg]$ cat recovered_doc 
+RebrainMe Linux ASYM
+[m.efoshkin@fedora .gnupg]$
+`
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+02.11.2022 10:36
+Добрый день!
+
+Отличные знание темы и выполнение задания, замечаний и вопросов нет!
