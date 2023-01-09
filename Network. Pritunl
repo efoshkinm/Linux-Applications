@@ -1,0 +1,75 @@
+
+Задание:
+Создайте виртуальную машину в облачном провайдере.
+Выполните установку и настройку Pritunl таким образом, чтобы через VPN проходили только адреса 1.1.1.1 и 8.8.8.8.
+Предоставьте ссылку на конфигурационный пакет.
+Задание будет проверяться путем подключения к вашему серверу с проверкой доступности указанных выше адресов.
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+15.10.2022 17:30
+1. Установка
+address: 84.201.154.130
+sudo tee /etc/yum.repos.d/mongodb-org-6.0.repo << EOF
+[mongodb-org-6.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/8/mongodb-org/6.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-6
+.0.asc
+EOF
+
+sudo tee /etc/yum.repos.d/pritunl.repo << EOF
+[pritunl]
+name=Pritunl Repository
+baseurl=https://repo.pritunl.com/stable/yum/oraclelinux/8/
+gpgcheck=1
+enabled=1
+EOF
+
+sudo dnf install wireguard-tools
+
+gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys 7568D9BB55FF9E5287D586017AE645C0CF8E292A
+gpg --armor --export 7568D9BB55FF9E5287D586017AE645C0CF8E292A > key.tmp; sudo rpm --import key.tmp; rm -f key.tmp
+
+sudo rpm --import https://raw.githubusercontent.com/pritunl/pgp/master/pritunl_repo_pub.asc
+sudo dnf clean all
+sudo dnf makecache
+sudo dnf -y install pritunl mongodb-org
+
+2. Настройка
+Увеличиваем лимит открытых файлов:
+sudo sh -c 'echo "* hard nofile 64000" >> /etc/security/limits.conf'
+sudo sh -c 'echo "* soft nofile 64000" >> /etc/security/limits.conf'
+sudo sh -c 'echo "root hard nofile 64000" >> /etc/security/limits.conf'
+sudo sh -c 'echo "root soft nofile 64000" >> /etc/security/limits.conf'
+
+Доступ
+https://84.201.154.130/setup
+
+sudo pritunl setup-key
+76e949fd2ef94543a3245257ef0cb404
+
+sudo pritunl default-password
+Administrator default password:
+  username: "pritunl"
+  password: "TYNhzoc7VYw1"
+
+Lets encrypt
+84.201.154.130.nip.io
+
+
+CLient 
+https://disk.yandex.ru/d/TBZMhQfTKDxW_A
+
+ОТВЕТ КУРАТОРА
+Oleg Avdeev (@oavdeev)
+ВЫПОЛНЕНО 5
+16.10.2022 14:35
+Добрый день! Туннель работает как требуется по заданию, отлично.
