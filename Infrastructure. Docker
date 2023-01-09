@@ -1,0 +1,169 @@
+Задание:
+Установите последнюю версию Docker runtime из официального репозитория.
+Добавьте вашего пользователя в группу для работы с docker от имени непривилегированного пользователя.
+Запустите контейнер с образом с nginx из стабильной ветки с именем rebrainme_linux и опубликованным в мир портом 8888, ведущим на порт приложения в контейнере, работающем в фоне и перезапускающемся автоматически всегда (команду и вывод сохраните).
+Выведите список работающих контейнеров (команду и вывод сохраните).
+Проверьте через браузер доступность nginx по указанному порту.
+Перезапустите сервер и еще раз проверьте через браузер доступность nginx по указанному порту.
+Выведите список работающих контейнеров (команду и вывод сохраните).
+Отправьте на проверку все сохраненные выводы и адрес, по которому можно проверить работу контейнера.
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+16.11.2022 07:04
+1. Установите последнюю версию Docker runtime из официального репозитория.
+address: 62.84.121.167
+
+ sudo apt-get remove docker docker-engine docker.io containerd runc
+ apt  update
+ sudo apt-get install ca-certificates curl gnupg lsb-release
+ # Добавим ключ
+ sudo mkdir -p /etc/apt/keyrings
+ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+ # Добавляем репозиторий 
+ echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+	# Установка
+	apt-get update
+	sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+	
+
+### Удаление. Это для истории
+apt-get purge docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo rm -rf /var/lib/docker
+sudo rm -rf /var/lib/containerd
+
+2. Добавьте вашего пользователя в группу для работы с docker от имени непривилегированного пользователя.
+usermod -aG docker yc-user
+
+3. Запустите контейнер с образом с nginx из стабильной ветки с именем rebrainme_linux и опубликованным в мир портом 8888, ведущим на порт приложения в контейнере, работающем в фоне и перезапускающемся автоматически всегда (команду и вывод сохраните).
+docker pull nginx:latest
+docker run -d --name rebrainme_linux -p 8888:80 --restart=always nginx
+
+4. Выведите список работающих контейнеров (команду и вывод сохраните).
+yc-user@epdgb5nuk03fo2vq966g:~$ docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED         STATUS         PORTS                                   NAMES
+adf0ca2a53fc   nginx     "/docker-entrypoint.…"   6 seconds ago   Up 5 seconds   0.0.0.0:8888->80/tcp, :::8888->80/tcp   rebrainme_linux
+yc-user@epdgb5nuk03fo2vq966g:~$ 
+5. Проверьте через браузер доступность nginx по указанному порту.
+ yc-user@epdgb5nuk03fo2vq966g:~$ curl 62.84.121.167:8888
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+yc-user@epdgb5nuk03fo2vq966g:~$ 
+ 
+ 
+6. Перезапустите сервер и еще раз проверьте через браузер доступность nginx по указанному порту.
+ sudo reboot
+yc-user@epdgb5nuk03fo2vq966g:~$ curl 62.84.121.167:8888
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+yc-user@epdgb5nuk03fo2vq966g:~$ 
+ 
+ 
+7. Выведите список работающих контейнеров (команду и вывод сохраните).
+yc-user@epdgb5nuk03fo2vq966g:~$ docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED         STATUS          PORTS                                   NAMES
+adf0ca2a53fc   nginx     "/docker-entrypoint.…"   4 minutes ago   Up 20 seconds   0.0.0.0:8888->80/tcp, :::8888->80/tcp   rebrainme_linux
+yc-user@epdgb5nuk03fo2vq966g:~$ 
+ 
+ 
+curl 62.84.121.167:8888
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 4
+16.11.2022 09:07
+Добрый день!
+
+Очень хорошо, одно замечание:
+
+п.3. "из стабильной ветки"
+16.11.2022 09:52
+ВЫПОЛНЕНО 4
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+16.11.2022 09:52
+docker pull nginx:stable
+docker run -d --name rebrainme_linux -p 8888:80 --restart=always nginx 
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 4
+16.11.2022 10:03
+Добрый день!
+
+docker pull nginx:stable
+Вы загружаете стабильный образ локально.
+
+docker run -d --name rebrainme_linux -p 8888:80 --restart=always nginx 
+но при запуске контейнера используете другой образ. Какой тег у образа по умолчанию?
+
+16.11.2022 10:24
+ВЫПОЛНЕНО 5
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+16.11.2022 10:24
+docker pull nginx:stable
+docker run -d --name rebrainme_linux -p 8888:80 --restart=always nginx:stable
+
+Дефолтный latest, точно! Спасибо!
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+16.11.2022 12:16
+Добрый день!
+
+Все верно, тег stable обычно указывает на стабильную ветку, а по умолчанию подставляется latest.
+
+docker pull nginx:stable
+не нужно загружать образ, если он уже есть
+в принципе можно не загружать явно, если при запуске контейнера образа не будет, то он будет загружен автоматически
+Отличные знание темы и выполнение задания, замечаний и вопросов нет!
