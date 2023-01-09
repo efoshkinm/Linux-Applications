@@ -1,0 +1,154 @@
+Задание:
+Создайте через rabbitmqctl пользователя vasya и выдайте ему права администратора. На проверку пришлите команды, которые использовались, a также результат выполнения команды rabbitmqctl list_users.
+Составьте команду rabbitmqctl list_queues, которая выводит для каждой очереди количество persistent и ram сообщений.
+
+
+
+****************************************************************************
+Решение
+****************************************************************************
+
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+02.12.2022 10:46
+1. Установка
+address: 158.160.12.146
+
+Воспользовался инструкциями с официального сайта по установке. 
+Там рекомендут скрипт
+vi install_rabbitmq.sh
+***********************************************************************************************
+#!/usr/bin/sh
+
+sudo apt-get install curl gnupg apt-transport-https -y
+
+## Team RabbitMQ's main signing key
+curl -1sLf "https://keys.openpgp.org/vks/v1/by-fingerprint/0A9AF2115F4687BD29803A206B73A36E6026DFCA" | sudo gpg --dearmor | sudo tee /usr/share/keyrings/com.rabbitmq.team.gpg > /dev/null
+## Launchpad PPA that provides modern Erlang releases
+curl -1sLf "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xf77f1eda57ebb1cc" | sudo gpg --dearmor | sudo tee /usr/share/keyrings/net.launchpad.ppa.rabbitmq.erlang.gpg > /dev/null
+## PackageCloud RabbitMQ repository
+curl -1sLf "https://packagecloud.io/rabbitmq/rabbitmq-server/gpgkey" | sudo gpg --dearmor | sudo tee /usr/share/keyrings/io.packagecloud.rabbitmq.gpg > /dev/null
+
+## Add apt repositories maintained by Team RabbitMQ
+sudo tee /etc/apt/sources.list.d/rabbitmq.list <<EOF
+## Provides modern Erlang/OTP releases
+##
+## "bionic" as distribution name should work for any reasonably recent Ubuntu or Debian release.
+## See the release to distribution mapping table in RabbitMQ doc guides to learn more.
+deb [signed-by=/usr/share/keyrings/net.launchpad.ppa.rabbitmq.erlang.gpg] http://ppa.launchpad.net/rabbitmq/rabbitmq-erlang/ubuntu bionic main
+deb-src [signed-by=/usr/share/keyrings/net.launchpad.ppa.rabbitmq.erlang.gpg] http://ppa.launchpad.net/rabbitmq/rabbitmq-erlang/ubuntu bionic main
+
+## Provides RabbitMQ
+##
+## "bionic" as distribution name should work for any reasonably recent Ubuntu or Debian release.
+## See the release to distribution mapping table in RabbitMQ doc guides to learn more.
+deb [signed-by=/usr/share/keyrings/io.packagecloud.rabbitmq.gpg] https://packagecloud.io/rabbitmq/rabbitmq-server/ubuntu/ bionic main
+deb-src [signed-by=/usr/share/keyrings/io.packagecloud.rabbitmq.gpg] https://packagecloud.io/rabbitmq/rabbitmq-server/ubuntu/ bionic main
+EOF
+
+## Update package indices
+sudo apt-get update -y
+
+## Install Erlang packages
+sudo apt-get install -y erlang-base \
+                        erlang-asn1 erlang-crypto erlang-eldap erlang-ftp erlang-inets \
+                        erlang-mnesia erlang-os-mon erlang-parsetools erlang-public-key \
+                        erlang-runtime-tools erlang-snmp erlang-ssl \
+                        erlang-syntax-tools erlang-tftp erlang-tools erlang-xmerl
+
+## Install rabbitmq-server and its dependencies
+sudo apt-get install rabbitmq-server -y --fix-missing
+**********************************************************************
+chmod +x install_rabbitmq.sh
+./install_rabbitmq.sh
+
+
+Добавляем пользователя
+rabbitmqctl add_user vasya secret
+Adding user "vasya" ...
+Done. Don't forget to grant the user permissions to some virtual hosts! See 'rabbitmqctl help set_permissions' to learn more.
+
+Даем права. 
+rabbitmqctl set_permissions  vasya ".*" ".*" ".*"
+Setting permissions for user "vasya" in vhost "/" ...
+
+rabbitmqctl authenticate_user vasya secret
+Authenticating user "vasya" ...
+Success
+
+Добавляем права администратора
+root@epdk2iip3lmaf9ctf0qd:/home/yc-user# rabbitmqctl set_user_tags vasya administrator
+Setting tags for user "vasya" to [administrator] ...
+
+root@epdk2iip3lmaf9ctf0qd:/home/yc-user# rabbitmqctl list_users
+Listing users ...
+user	tags
+vasya	[administrator]
+guest	[administrator]
+
+
+2. Составьте команду rabbitmqctl list_queues, которая выводит для каждой очереди количество persistent и ram сообщений.
+rabbitmqctl list_queues --local message_bytes_persistent memory
+
+Проверяем
+Создаем скрипт отправки сообщений
+root@epdk2iip3lmaf9ctf0qd:/home/yc-user# vi send.py 
+#!/usr/bin/env python
+import pika
+
+connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+channel = connection.channel()
+channel.queue_declare(queue='hello')
+channel.basic_publish(exchange='',
+                      routing_key='hello',
+                      body='Hello World!')
+print(" [x] Sent 'Hello World!'")
+connection.close()
+
+root@epdk2iip3lmaf9ctf0qd:/home/yc-user# cat receive.py 
+#!/usr/bin/env python
+import pika
+
+connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+channel = connection.channel()
+channel.queue_declare(queue='hello')
+def callback(ch, method, properties, body):
+    print(" [x] Received %r" % body)
+channel.basic_consume(queue='hello',
+                      auto_ack=True,
+                      on_message_callback=callback)
+print(' [*] Waiting for messages. To exit press CTRL+C')
+channel.start_consuming()
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        print('Interrupted')
+        try:
+            sys.exit(0)
+        except SystemExit:
+            os._exit(0)
+
+Проверяем
+root@epdk2iip3lmaf9ctf0qd:/home/yc-user# python3 send.py 
+ [x] Sent 'Hello World!'
+
+python3 receive.py 
+ [*] Waiting for messages. To exit press CTRL+C
+ [x] Received b'Hello World!'
+
+Проверка
+root@epdk2iip3lmaf9ctf0qd:/home/yc-user# rabbitmqctl list_queues --local message_bytes_persistent memory
+Timeout: 60.0 seconds ...
+Listing queues for vhost / ...
+message_bytes_persistent	memory
+0	34808
+
+
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+03.12.2022 07:12
+Добрый день!
+
+Отличные знание темы и обстоятельный разбор задания, замечаний и вопросов нет!
