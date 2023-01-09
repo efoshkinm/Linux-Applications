@@ -1,0 +1,97 @@
+Задание:
+Настройте WireGuard сервер, что бы мобильные устройства/клиенты пропускали весь трафик через VPN.
+Способ проверки, подключившись к VPN, откройте сайт https://2ip.ru, вы должны увидеть внешний IP на котором находится ваш WireGuard сервер.
+
+Результатом выполнения задания должен стать файл конфигурации для одного(!) мобильного клиента.
+Настройка клиента должна выполняться сканированием подготовленного QR-кода.
+Проверка будет выполняться путем подключения с клиента.
+
+
+****************************************************************************
+Решение
+****************************************************************************
+Ефошкин Максим Вячеславович
+ОТПРАВЛЕНО
+24.10.2022 07:57
+1. Установка
+Host 1
+address: 158.160.9.137
+
+sudo dnf install wireguard-tools
+cd /etc/wireguard/
+
+# Генерация ключей
+wg genkey | (umask 0077 && tee peer_A.key) | wg pubkey > peer_A.pub
+
+[root@epdq4r3k2g5l0t1dqdq0 wireguard]# cat my_config.conf 
+[Interface]
+Address = 192.168.1.1/24
+ListenPort = 51871
+PrivateKey = sIU/dq0TarMP2dpBvWMsJs4/ZPmLF47+65bL6QdBWFA=
+
+[Peer]
+PublicKey = cacOHee4WdP7Zc9qw+A5ekmp5hXM4JeBQhYL0pDOzgo=
+AllowedIPs = 192.168.1.2/32
+Endpoint = 51.250.29.33:51871
+
+[Peer]
+PublicKey = GjG+wGlmc8PiPglaB/5U+0Obty1qqBLtzVsECy/quWc=
+AllowedIPs = 192.168.1.3/32
+
+[root@epdq4r3k2g5l0t1dqdq0 wireguard]# wg-quick up my_config
+[#] ip link add my_config type wireguard
+[#] wg setconf my_config /dev/fd/63
+[#] ip -4 address add 192.168.1.1/24 dev my_config
+[#] ip link set mtu 1420 up dev my_config
+
+Host 2
+address: 51.250.29.33
+sudo dnf install wireguard-tools
+cd /etc/wireguard/
+wg genkey | (umask 0077 && tee peer_B.key) | wg pubkey > peer_B.pub
+
+[root@epdvdetrllkb226s3n14 wireguard]# cat myconf.conf 
+[Interface]
+Address = 192.168.1.2/24
+ListenPort = 51871
+PrivateKey = oMsiez6gUiOJIQqsaa+aBj3KCkCZUQ+IMll3+CCD8U8=
+ 
+ 
+[Peer]
+PublicKey = 7eo+LUYxDrMJjN23tJlOJiyQ4vmtz3zMnqWqv/NlASg=
+AllowedIPs = 192.168.1.1/32
+Endpoint = 51.250.110.115:51871
+
+[root@epdvdetrllkb226s3n14 wireguard]# wg-quick up myconf
+[#] ip link add myconf type wireguard
+[#] wg setconf myconf /dev/fd/63
+[#] ip -4 address add 192.168.1.2/24 dev myconf
+[#] ip link set mtu 1420 up dev myconf
+
+
+
+
+Mobile Client
+config
+
+[Interface]
+Address = 192.168.1.3/24
+ListenPort = 51871
+PrivateKey = yDnHsCWpVlV6xZkXhFgSVUSE2QcxtIu6E5xK8k2NdnI=
+
+
+[Peer]
+PublicKey = 7eo+LUYxDrMJjN23tJlOJiyQ4vmtz3zMnqWqv/NlASg=
+AllowedIPs = 0.0.0.0/0
+Endpoint = 158.160.9.137:51871
+
+QR code
+https://disk.yandex.ru/i/A2ALpUBd3B03Cg
+ОТВЕТ КУРАТОРА
+Алексей Кузнецов (@Hystrix)
+ВЫПОЛНЕНО 5
+25.10.2022 09:11
+Добрый день!
+
+Отличные знание темы и выполнение задания, профиль импортируется, соединение устанавливается, трафик идет, замечаний и вопросов нет!
+
